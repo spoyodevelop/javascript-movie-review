@@ -35,12 +35,21 @@
     fetch(link.href, fetchOpts);
   }
 })();
+const ERROR_MESSAGE = {
+  FETCH_ERROR: "API 서버 상태가 좋지 않아 데이터를 가져오는데 실패했습니다.",
+  NO_DATA: "검색 값을 찾지 못했어요."
+};
+async function fetchUrl(url, queryObject, options = {}) {
+  const queryString = new URLSearchParams(queryObject).toString();
+  const finalUrl = queryString ? `${url}?${queryString}` : url;
+  const response = await fetch(finalUrl, options);
+  if (!response.ok || !navigator.onLine)
+    throw new Error(ERROR_MESSAGE.FETCH_ERROR);
+  return response.json() || [];
+}
 const URLS = {
   popularMovieUrl: "https://api.themoviedb.org/3/movie/popular",
   searchMovieUrl: "https://api.themoviedb.org/3/search/movie"
-};
-const ERROR_MESSAGE = {
-  FETCH_ERROR: "API 서버 상태가 좋지 않아 데이터를 가져오는데 실패했습니다."
 };
 const defaultOptions = {
   headers: {
@@ -52,27 +61,55 @@ const defaultQueryObject = {
   include_adult: false
 };
 const TOTAL_PAGE = 500;
-async function fetchUrl(url, queryObject, options = {}) {
-  const queryString = new URLSearchParams(queryObject).toString();
-  const finalUrl = queryString ? `${url}?${queryString}` : url;
-  const response = await fetch(finalUrl, options);
-  if (!response.ok) throw new Error(ERROR_MESSAGE.FETCH_ERROR);
-  return response.json();
-}
+const Toast = {
+  showToast(message, type = "error", duration = 5e3) {
+    if (type === "info") duration = 2e3;
+    let toastContainer = document.querySelector(".toast-container");
+    if (!toastContainer) {
+      toastContainer = document.createElement("div");
+      toastContainer.className = "toast-container";
+      document.body.appendChild(toastContainer);
+    }
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    if (type == "error") message = message.replace("[ERROR]", "");
+    toast.innerHTML = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add("show");
+    }, 100);
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+    toast.addEventListener("click", () => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    });
+  },
+  resetToast() {
+    let toastContainer = document.querySelector(".toast-container");
+    if (toastContainer) toastContainer.remove();
+  }
+};
 function createMovieLoader(url, queryObj, options, searchTerm) {
   let page = 1;
   return async () => {
     const queryObject = searchTerm ? { query: searchTerm, ...queryObj, page } : { ...queryObj, page };
-    const { results, total_pages } = await fetchUrl(
-      url,
-      queryObject,
-      options
-    );
+    let response = null;
+    try {
+      response = await fetchUrl(url, queryObject, options);
+    } catch (error) {
+      Toast.showToast(error.message, "error", 5e3);
+      return { results: [], isLastPage: true };
+    }
+    if (!response || !response.results)
+      throw new Error(ERROR_MESSAGE.FETCH_ERROR);
+    if (response.results.length === 0) throw new Error(ERROR_MESSAGE.NO_DATA);
+    const { results, total_pages } = response;
     const pageLimit = Math.min(TOTAL_PAGE, total_pages);
-    if (results.length === 0) throw new Error("검색 값을 찾지 못했어요.");
     page++;
-    if (page > pageLimit) return { results, isLastPage: true };
-    return { results, isLastPage: false };
+    return { results, isLastPage: page > pageLimit };
   };
 }
 function createElement(tag, props = {}) {
@@ -153,37 +190,6 @@ function addMovies(results, reset) {
   });
   $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
 }
-const Toast = {
-  showToast(message, type = "error", duration = 5e3) {
-    if (type === "info") duration = 2e3;
-    let toastContainer = document.querySelector(".toast-container");
-    if (!toastContainer) {
-      toastContainer = document.createElement("div");
-      toastContainer.className = "toast-container";
-      document.body.appendChild(toastContainer);
-    }
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    if (type == "error") message = message.replace("[ERROR]", "");
-    toast.innerHTML = message;
-    toastContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add("show");
-    }, 100);
-    setTimeout(() => {
-      toast.classList.remove("show");
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
-    toast.addEventListener("click", () => {
-      toast.classList.remove("show");
-      setTimeout(() => toast.remove(), 300);
-    });
-  },
-  resetToast() {
-    let toastContainer = document.querySelector(".toast-container");
-    if (toastContainer) toastContainer.remove();
-  }
-};
 async function handleSearch(searchValue) {
   updateSearchDescription(searchValue);
   prepareUIForSearch();
@@ -209,12 +215,10 @@ function updateSearchDescription(searchValue) {
 function prepareUIForSearch() {
   const $fallback = document.getElementById("fallback-div");
   const $hero = document.getElementById("hero");
-  const $loadMore = document.getElementById("load-more");
   const $thumbnailList = document.getElementById("thumbnail-list");
   hideElement($fallback);
   hideElement($hero);
   hideElement($thumbnailList);
-  showElement($loadMore);
 }
 function finalizeUISuccess() {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
@@ -225,12 +229,10 @@ function finalizeUISuccess() {
 function handleSearchError(error) {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
   const $fallback = document.getElementById("fallback-div");
-  const $loadMore = document.getElementById("load-more");
   if (error instanceof Error) {
     Toast.showToast(error.message, "error", 5e3);
   }
   hideElement($thumbnailContainer);
-  hideElement($loadMore);
   showElement($fallback);
 }
 function Header() {
@@ -321,7 +323,6 @@ function setupHeaderAndHero() {
 }
 function setupLoadMoreButton() {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
-  document.querySelector(".main");
   if ($thumbnailContainer) {
     const loadMoreButton = Button({
       className: ["primary", "width-100"],

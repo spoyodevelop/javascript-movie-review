@@ -141,28 +141,41 @@ function showElement(element) {
 function hideElement(element) {
   element == null ? void 0 : element.classList.add("hide");
 }
-function MovieItem({ src, title, rate }) {
+function hideImgSkeleton(event) {
+  const img = event.target;
+  showElement(img);
+  const skeleton = img.parentElement.parentElement.querySelector(
+    ".skeleton-thumbnail"
+  );
+  skeleton == null ? void 0 : skeleton.remove();
+}
+function MovieItem({ src, title, rate, onload }) {
   const $li = createElement("li");
   let url = `https://image.tmdb.org/t/p/w500/${src}`;
   if (!src) url = "images/fallback.png";
   $li.innerHTML = `
     <li>
-        <div class="item">
-            <img
-            class="thumbnail"
-            src='${url}'
-            alt=${title}
-            />
-            <div class="item-desc">
-            <p class="rate">
-                <img src="./images/star_empty.png" class="star" />
-                <span>${rate}</span>
-            </p>
-            <strong>${title}</strong>
-            </div>
+      <div class="skeleton-thumbnail thumbnail"></div>
+      <div class="item">
+        <img
+          class="thumbnail hide"
+          src="${url}"
+          alt="${title}"
+        />
+        <div class="item-desc">
+          <p class="rate">
+            <img src="./images/star_empty.png" class="star" />
+            <span>${Number(rate).toFixed(1)}</span>
+          </p>
+          <strong>${title}</strong>
         </div>
+      </div>
     </li>
-    `;
+  `;
+  if (onload) {
+    const img = $li.querySelector("img.thumbnail");
+    img.addEventListener("load", onload);
+  }
   return $li;
 }
 async function createMovieList(loadMovies, reset) {
@@ -184,7 +197,8 @@ function addMovies(results, reset) {
     const movieItem = MovieItem({
       title,
       src: poster_path,
-      rate: vote_average
+      rate: vote_average,
+      onload: hideImgSkeleton
     });
     return movieItem;
   });

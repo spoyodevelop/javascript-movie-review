@@ -320,15 +320,16 @@ function setupHeaderAndHero() {
   }
 }
 function setupLoadMoreButton() {
-  const $main = document.querySelector(".main");
-  if ($main) {
+  const $thumbnailContainer = document.getElementById("thumbnail-container");
+  document.querySelector(".main");
+  if ($thumbnailContainer) {
     const loadMoreButton = Button({
       className: ["primary", "width-100"],
       placeholder: "더보기",
       id: "load-more",
       onClick: () => createMovieList(state.loadMovies)
     });
-    $main.append(loadMoreButton);
+    $thumbnailContainer.append(loadMoreButton);
   }
 }
 init();

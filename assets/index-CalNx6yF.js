@@ -95,12 +95,6 @@ function createElementsFragment(elements) {
   fragment.append(...elements);
   return fragment;
 }
-function addEventListenerBySelector(selector, eventType, callback) {
-  const element = document.querySelector(selector);
-  if (element) {
-    element.addEventListener(eventType, callback);
-  }
-}
 const state = {
   loadMovies: null
 };
@@ -213,16 +207,14 @@ function updateSearchDescription(searchValue) {
   }
 }
 function prepareUIForSearch() {
-  const $fallbackDiv = document.getElementById("fallback-div");
+  const $fallback = document.getElementById("fallback-div");
   const $hero = document.getElementById("hero");
   const $loadMore = document.getElementById("load-more");
   const $thumbnailList = document.getElementById("thumbnail-list");
-  const $thumbnailContainer = document.getElementById("thumbnail-container");
-  hideElement($fallbackDiv);
+  hideElement($fallback);
   hideElement($hero);
   hideElement($thumbnailList);
   showElement($loadMore);
-  showElement($thumbnailContainer);
 }
 function finalizeUISuccess() {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
@@ -232,12 +224,14 @@ function finalizeUISuccess() {
 }
 function handleSearchError(error) {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
-  const $fallbackDiv = document.getElementById("fallback-div");
+  const $fallback = document.getElementById("fallback-div");
   const $loadMore = document.getElementById("load-more");
-  Toast.showToast(error.message, "error", 5e3);
+  if (error instanceof Error) {
+    Toast.showToast(error.message, "error", 5e3);
+  }
   hideElement($thumbnailContainer);
   hideElement($loadMore);
-  showElement($fallbackDiv);
+  showElement($fallback);
 }
 function Header() {
   const $headerContainer = createElement("div", {
@@ -265,13 +259,13 @@ function Header() {
     className: "search-bar",
     placeholder: "검색어를 입력하세요"
   });
-  addEventListenerBySelector(".input-form", "submit", (event) => {
+  $form.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const searchValue = formData.get("search-bar");
     handleSearch(searchValue);
   });
-  addEventListenerBySelector(".logo", "click", () => {
+  $logo.addEventListener("click", () => {
     location.reload();
   });
   $searchButton.appendChild($searchImg);
@@ -286,8 +280,9 @@ function Hero() {
     id: "hero",
     className: "background-container"
   });
-  backgroundHero.innerHTML = ` 
-  <div class="overlay" aria-hidden="true" ></div>
+  backgroundHero.innerHTML = `
+
+    <div class="overlay" aria-hidden="true" ></div>
        <div class="top-rated-container">
             <div class="top-rated-movie">
                <div class="rate">
@@ -297,7 +292,8 @@ function Hero() {
                <div class="title">인사이드 아웃2</div>
               <button class="primary detail">자세히 보기</button>
              </div>
-           </div>`;
+  </div>
+`;
   return backgroundHero;
 }
 function Button({ className, placeholder, onClick, id }) {

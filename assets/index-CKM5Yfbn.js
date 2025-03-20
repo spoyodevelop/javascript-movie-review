@@ -101,6 +101,15 @@ function addEventListenerBySelector(selector, eventType, callback) {
     element.addEventListener(eventType, callback);
   }
 }
+const state = {
+  loadMovies: null
+};
+function showElement(element) {
+  element == null ? void 0 : element.classList.remove("hide");
+}
+function hideElement(element) {
+  element == null ? void 0 : element.classList.add("hide");
+}
 function MovieItem({ src, title, rate }) {
   const $li = createElement("li");
   let url = `https://image.tmdb.org/t/p/w500/${src}`;
@@ -125,22 +134,30 @@ function MovieItem({ src, title, rate }) {
     `;
   return $li;
 }
-const state = {
-  loadMovies: null
-};
-function showElement(element) {
-  element == null ? void 0 : element.classList.remove("hide");
-}
-function hideElement(element) {
-  element == null ? void 0 : element.classList.add("hide");
-}
-function showSkeleton() {
+async function createMovieList(loadMovies, reset) {
+  var _a;
   const skeleton = document.querySelector(".skeleton-list");
-  if (skeleton) skeleton.classList.remove("hide");
+  showElement(skeleton);
+  const { results, isLastPage } = await loadMovies();
+  hideElement(skeleton);
+  if (isLastPage) {
+    (_a = document.getElementById("load-more")) == null ? void 0 : _a.classList.add("hide");
+  }
+  addMovies(results, reset);
 }
-function hideSkeleton() {
-  const skeleton = document.querySelector(".skeleton-list");
-  if (skeleton) skeleton.classList.add("hide");
+function addMovies(results, reset) {
+  const $list = document.getElementById("thumbnail-list");
+  if (reset && $list) $list.innerHTML = "";
+  const movieItems = results.map((result) => {
+    const { title, poster_path, vote_average } = result;
+    const movieItem = MovieItem({
+      title,
+      src: poster_path,
+      rate: vote_average
+    });
+    return movieItem;
+  });
+  $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
 }
 const Toast = {
   showToast(message, type = "error", duration = 5e3) {
@@ -173,30 +190,6 @@ const Toast = {
     if (toastContainer) toastContainer.remove();
   }
 };
-async function createMovieList$1(loadMovies, reset) {
-  var _a;
-  showSkeleton();
-  const { results, isLastPage } = await loadMovies();
-  hideSkeleton();
-  if (isLastPage) {
-    (_a = document.getElementById("load-more")) == null ? void 0 : _a.classList.add("hide");
-  }
-  addMovies$1(results);
-}
-function addMovies$1(results, reset) {
-  const $list = document.getElementById("thumbnail-list");
-  if ($list) $list.innerHTML = "";
-  const movieItems = results.map((result) => {
-    const { title, poster_path, vote_average } = result;
-    const movieItem = MovieItem({
-      title,
-      src: poster_path,
-      rate: vote_average
-    });
-    return movieItem;
-  });
-  $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
-}
 async function handleSearch(searchValue) {
   updateSearchDescription(searchValue);
   prepareUIForSearch();
@@ -207,7 +200,7 @@ async function handleSearch(searchValue) {
       defaultOptions,
       searchValue
     );
-    await createMovieList$1(state.loadMovies, true);
+    await createMovieList(state.loadMovies, true);
     finalizeUISuccess();
   } catch (error) {
     handleSearchError(error);
@@ -313,16 +306,15 @@ function Button({ className, placeholder, onClick, id }) {
   $button.addEventListener("click", onClick);
   return $button;
 }
-state.loadMovies = createMovieLoader(
-  URLS.popularMovieUrl,
-  defaultQueryObject,
-  defaultOptions
-);
 function init() {
+  state.loadMovies = createMovieLoader(
+    URLS.popularMovieUrl,
+    defaultQueryObject,
+    defaultOptions
+  );
   setupHeaderAndHero();
   createMovieList(state.loadMovies);
   setupLoadMoreButton();
-  setupEventListeners();
 }
 function setupHeaderAndHero() {
   const $wrap = document.getElementById("wrap");
@@ -343,39 +335,4 @@ function setupLoadMoreButton() {
     $main.append(loadMoreButton);
   }
 }
-function setupEventListeners() {
-  addEventListenerBySelector(".input-form", "submit", (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const searchValue = formData.get("search-bar");
-    handleSearch(searchValue);
-  });
-  addEventListenerBySelector(".logo", "click", handleLogoClick);
-}
-async function handleLogoClick() {
-  location.reload();
-}
-async function createMovieList(loadMovies, reset) {
-  var _a;
-  showSkeleton();
-  const { results, isLastPage } = await loadMovies();
-  hideSkeleton();
-  if (isLastPage) {
-    (_a = document.getElementById("load-more")) == null ? void 0 : _a.classList.add("hide");
-  }
-  addMovies(results);
-}
 init();
-function addMovies(results, reset) {
-  const $list = document.getElementById("thumbnail-list");
-  const movieItems = results.map((result) => {
-    const { title, poster_path, vote_average } = result;
-    const movieItem = MovieItem({
-      title,
-      src: poster_path,
-      rate: vote_average
-    });
-    return movieItem;
-  });
-  $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
-}

@@ -37,15 +37,26 @@
 })();
 const ERROR_MESSAGE = {
   FETCH_ERROR: "API 서버 상태가 좋지 않아 데이터를 가져오는데 실패했습니다.",
-  NO_DATA: "검색 값을 찾지 못했어요."
+  NO_DATA: "검색 값을 찾지 못했어요.",
+  SERVER_ERROR: "서버에서 오류가 발생했습니다. 관리자에게 문의하세요.",
+  NETWORK_DISCONNECTED: "인터넷 연결이 끊어졌습니다. 연결을 확인해 주세요."
 };
 async function fetchUrl(url, queryObject, options = {}) {
   const queryString = new URLSearchParams(queryObject).toString();
   const finalUrl = queryString ? `${url}?${queryString}` : url;
-  const response = await fetch(finalUrl, options);
-  if (!response.ok || !navigator.onLine)
+  try {
+    const response = await fetch(finalUrl, options);
+    if (!response.ok) {
+      throw new Error(ERROR_MESSAGE.SERVER_ERROR);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    if (!navigator.onLine) {
+      throw new Error(ERROR_MESSAGE.NETWORK_DISCONNECTED);
+    }
     throw new Error(ERROR_MESSAGE.FETCH_ERROR);
-  return response.json() || [];
+  }
 }
 const URLS = {
   popularMovieUrl: "https://api.themoviedb.org/3/movie/popular",

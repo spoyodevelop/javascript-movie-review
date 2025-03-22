@@ -230,7 +230,7 @@ function Header() {
     className: "header-container"
   });
   const $header = createElement("header", { className: "header" });
-  const $logo = createElement("h1", { className: "logo" });
+  const $logo = createElement("h1", { className: "logo", id: "logo" });
   const $logoImg = createElement("img", {
     src: paths.logo,
     alt: "MovieList"
@@ -381,7 +381,9 @@ function renderLoadMoreButton(state2) {
       className: ["primary", "width-100"],
       placeholder: "더보기",
       id: "load-more",
-      onClick: () => renderMovieList(state2.loadMovies)
+      onClick: () => {
+        if (state2.loadMovies) renderMovieList(state2.loadMovies);
+      }
     });
     $thumbnailContainer.append(loadMoreButton);
   }

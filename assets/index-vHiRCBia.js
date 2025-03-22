@@ -89,7 +89,7 @@ const TOTAL_PAGE = 500;
 const paths = {
   logo: "./images/logo.png",
   search: "./images/Search.png",
-  star_empty: "/images/star_empty.png"
+  star_empty: "./images/star_empty.png"
 };
 function getPlainQuery(queryObj) {
   return queryObj instanceof URLSearchParams ? Object.fromEntries(queryObj.entries()) : queryObj;

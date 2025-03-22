@@ -187,7 +187,7 @@ async function handleSearch(searchValue) {
     (error) => handleSearchError(error),
     searchValue
   );
-  await updateMovieList(state.loadMovies, true);
+  await renderMovieList(state.loadMovies, true);
   displaySearchResults();
 }
 function setSearchResultTitle(searchValue) {
@@ -331,6 +331,34 @@ function hideImgSkeleton(event) {
   );
   skeleton == null ? void 0 : skeleton.remove();
 }
+function renderMovieItems(results, reset) {
+  const $list = document.getElementById("thumbnail-list");
+  if (reset && $list) $list.innerHTML = "";
+  const movieItems = results.map((result) => {
+    const { title, poster_path, vote_average } = result;
+    return MovieItem({
+      title,
+      src: poster_path,
+      rate: vote_average,
+      onload: hideImgSkeleton
+    });
+  });
+  $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
+}
+async function handleMovieList(loadMovies, reset) {
+  const skeleton = document.querySelector(".skeleton-list");
+  const loadMore = document.getElementById("load-more");
+  showElement(skeleton);
+  hideElement(loadMore);
+  const { results, isLastPage } = await loadMovies();
+  showElement(loadMore);
+  hideElement(skeleton);
+  if (isLastPage) hideElement(loadMore);
+  renderMovieItems(results, reset);
+}
+async function renderMovieList(loadMovies, reset) {
+  await handleMovieList(loadMovies, reset);
+}
 function renderHeaderAndHero() {
   const $wrap = document.getElementById("wrap");
   if ($wrap) {
@@ -345,51 +373,27 @@ function renderLoadMoreButton(state2) {
       className: ["primary", "width-100"],
       placeholder: "더보기",
       id: "load-more",
-      onClick: () => updateMovieList(state2.loadMovies)
+      onClick: () => renderMovieList(state2.loadMovies)
     });
     $thumbnailContainer.append(loadMoreButton);
   }
 }
-async function updateMovieList(loadMovies, reset) {
-  var _a;
-  const skeleton = document.querySelector(".skeleton-list");
-  const loadMore = document.getElementById("load-more");
-  showElement(skeleton);
-  hideElement(loadMore);
-  const { results, isLastPage } = await loadMovies();
-  showElement(loadMore);
-  hideElement(skeleton);
-  if (isLastPage) {
-    (_a = document.getElementById("load-more")) == null ? void 0 : _a.classList.add("hide");
-  }
-  renderMovies(results, reset);
-}
-function renderMovies(results, reset) {
-  const $list = document.getElementById("thumbnail-list");
-  if (reset && $list) $list.innerHTML = "";
-  const movieItems = results.map((result) => {
-    const { title, poster_path, vote_average } = result;
-    const movieItem = MovieItem({
-      title,
-      src: poster_path,
-      rate: vote_average,
-      onload: hideImgSkeleton
-    });
-    return movieItem;
-  });
-  $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
-}
-function main() {
-  state.loadMovies = createMovieLoader(
-    URLS.popularMovieUrl,
-    defaultQueryObject,
-    defaultOptions,
-    (error) => {
-      Toast.showToast(error.message, "error", 5e3);
-    }
-  );
+const initMovies = () => createMovieLoader(
+  URLS.popularMovieUrl,
+  defaultQueryObject,
+  defaultOptions,
+  (error) => Toast.showToast(error.message, "error", 5e3)
+);
+const initState = () => ({
+  loadMovies: initMovies()
+});
+const renderApp = (state2) => {
   renderHeaderAndHero();
-  updateMovieList(state.loadMovies);
-  renderLoadMoreButton(state);
-}
+  renderMovieList(state2.loadMovies);
+  renderLoadMoreButton(state2);
+};
+const main = () => {
+  Object.assign(state, initState());
+  renderApp(state);
+};
 main();

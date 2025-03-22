@@ -83,7 +83,7 @@ const defaultOptions = {
 };
 const defaultQueryObject = {
   language: "ko-KR",
-  include_adult: false
+  include_adult: "false"
 };
 const TOTAL_PAGE = 500;
 const paths = {
@@ -95,7 +95,7 @@ function getPlainQuery(queryObj) {
   return queryObj instanceof URLSearchParams ? Object.fromEntries(queryObj.entries()) : queryObj;
 }
 function buildQuery(plainQuery, searchTerm, page) {
-  return searchTerm ? { query: searchTerm, ...plainQuery, page } : { ...plainQuery, page };
+  return searchTerm ? { query: searchTerm, ...plainQuery, page: String(page) } : { ...plainQuery, page: String(page) };
 }
 const ERROR_MESSAGE = {
   FETCH_ERROR: "API 서버 상태가 좋지 않아 데이터를 가져오는데 실패했습니다.",
@@ -130,7 +130,11 @@ function validateResponse(response) {
 }
 async function fetchMovies(url, queryObject, options, onError) {
   try {
-    const response = await fetchUrl(url, queryObject, options);
+    const response = await fetchUrl(
+      url,
+      new URLSearchParams(queryObject),
+      options
+    );
     validateResponse(response);
     return response;
   } catch (error) {
@@ -139,7 +143,7 @@ async function fetchMovies(url, queryObject, options, onError) {
     } else {
       throw error;
     }
-    return { results: [], total_pages: 0 };
+    return { results: [], total_pages: 0, page: 1, total_results: 0 };
   }
 }
 function createMovieLoader(url, queryObj, options, onError, searchTerm) {
@@ -159,17 +163,19 @@ const state = {
 };
 function createElement(tag, props = {}) {
   const element = document.createElement(tag);
-  Object.entries(props).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(props)) {
     if (key === "className") {
       if (Array.isArray(value)) {
         element.classList.add(...value);
       } else if (typeof value === "string") {
         element.classList.add(value);
       }
-      return;
+      continue;
     }
-    if (key in element) element[key] = value;
-  });
+    if (key in element) {
+      element[key] = value;
+    }
+  }
   return element;
 }
 function createElementsFragment(elements) {
@@ -324,9 +330,11 @@ function hideElement(element) {
   element == null ? void 0 : element.classList.add("hide");
 }
 function hideImgSkeleton(event) {
+  var _a, _b;
   const img = event.target;
-  if (img) showElement(img);
-  const skeleton = img.parentElement.parentElement.querySelector(
+  if (!img) return;
+  showElement(img);
+  const skeleton = (_b = (_a = img.parentElement) == null ? void 0 : _a.parentElement) == null ? void 0 : _b.querySelector(
     ".skeleton-thumbnail"
   );
   skeleton == null ? void 0 : skeleton.remove();
@@ -388,6 +396,7 @@ const initState = () => ({
   loadMovies: initMovies()
 });
 const renderApp = (state2) => {
+  if (!state2.loadMovies) return;
   renderHeaderAndHero();
   renderMovieList(state2.loadMovies);
   renderLoadMoreButton(state2);

@@ -159,7 +159,8 @@ function createMovieLoader(url, queryObj, options, onError, searchTerm) {
   };
 }
 const state = {
-  loadMovies: null
+  loadMovies: null,
+  heroMovie: null
 };
 function createElement(tag, props = {}) {
   const element = document.createElement(tag);
@@ -183,6 +184,14 @@ function createElementsFragment(elements) {
   fragment.append(...elements);
   return fragment;
 }
+async function fetchAndSetLoadingEvent(state2) {
+  document.dispatchEvent(new CustomEvent("loading:start"));
+  const data = await state2.loadMovies();
+  document.dispatchEvent(
+    new CustomEvent("loading:end", { detail: { isLastPage: data.isLastPage } })
+  );
+  return data;
+}
 async function handleSearch(searchValue) {
   setSearchResultTitle(searchValue);
   setSearchLoadingState();
@@ -190,10 +199,11 @@ async function handleSearch(searchValue) {
     URLS.searchMovieUrl,
     defaultQueryObject,
     defaultOptions,
-    (error) => handleSearchError(error),
+    (error) => handleSearchError$1(error),
     searchValue
   );
-  await renderMovieList(state.loadMovies, true);
+  const data = await fetchAndSetLoadingEvent(state);
+  renderMovieItems(data.results, true);
   displaySearchResults();
 }
 function setSearchResultTitle(searchValue) {
@@ -216,12 +226,12 @@ function displaySearchResults() {
   showElement($thumbnailContainer);
   showElement($thumbnailList);
 }
-function handleSearchError(error) {
+function handleSearchError$1(error) {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
   const $fallback = document.getElementById("fallback");
-  if (error instanceof Error) {
-    Toast.showToast(error.message, "error", 5e3);
-  }
+  const $fallbackDetails = document.getElementById("fallback-details");
+  if (error instanceof Error) Toast.showToast(error.message, "error", 5e3);
+  $fallbackDetails.innerText = "검색 결과가 없습니다.";
   hideElement($thumbnailContainer);
   showElement($fallback);
 }
@@ -274,17 +284,24 @@ function Hero() {
   });
   backgroundHero.innerHTML = `
 
-    <div class="overlay" aria-hidden="true" ></div>
-       <div class="top-rated-container">
-            <div class="top-rated-movie">
+    <div class="overlay">
+    
+    <div class="hero-skeleton" id="hero-skeleton"></div>
+    <img id="hero-img" alt="Hero Image" class="hero-img"/>
+     <div class="overlay" aria-hidden="true"></div>
+      <div class="top-rated-container">
+          <div class="top-rated-movie hide" id="top-rated-container">
                <div class="rate">
                  <img src="${paths.star_empty}" class="star" />
-                 <span class="rate-value">9.5</span>
+                 <span class="rate-value" id="hero-rate"></span>
                </div>
-               <div class="title">인사이드 아웃2</div>
+               <div class="title" id="hero-title"></div>
               <button class="primary detail">자세히 보기</button>
-             </div>
-  </div>
+            </div>
+        </div>
+    
+    </div>
+       
 `;
   return backgroundHero;
 }
@@ -294,12 +311,11 @@ function Button({ className, placeholder, onClick, id }) {
   $button.addEventListener("click", onClick);
   return $button;
 }
-function MovieItem({ src, title, rate, onload }) {
-  const $li = createElement("li");
+function MovieItem({ id, src, title, rate, onload }) {
+  const $li = createElement("li", { id });
   let url = `https://image.tmdb.org/t/p/w500/${src}`;
   if (!src) url = "images/fallback.png";
   $li.innerHTML = `
-    <li>
       <div class="skeleton-thumbnail thumbnail"></div>
       <div class="item">
         <img
@@ -315,7 +331,6 @@ function MovieItem({ src, title, rate, onload }) {
           <strong>${title}</strong>
         </div>
       </div>
-    </li>
   `;
   if (onload) {
     const img = $li.querySelector("img.thumbnail");
@@ -343,8 +358,9 @@ function renderMovieItems(results, reset) {
   const $list = document.getElementById("thumbnail-list");
   if (reset && $list) $list.innerHTML = "";
   const movieItems = results.map((result) => {
-    const { title, poster_path, vote_average } = result;
+    const { id, title, poster_path, vote_average } = result;
     return MovieItem({
+      id,
       title,
       src: poster_path,
       rate: vote_average,
@@ -352,20 +368,6 @@ function renderMovieItems(results, reset) {
     });
   });
   $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
-}
-async function handleMovieList(loadMovies, reset) {
-  const skeleton = document.querySelector(".skeleton-list");
-  const loadMore = document.getElementById("load-more");
-  showElement(skeleton);
-  hideElement(loadMore);
-  const { results, isLastPage } = await loadMovies();
-  showElement(loadMore);
-  hideElement(skeleton);
-  if (isLastPage) hideElement(loadMore);
-  renderMovieItems(results, reset);
-}
-async function renderMovieList(loadMovies, reset) {
-  await handleMovieList(loadMovies, reset);
 }
 function renderHeaderAndHero() {
   const $wrap = document.getElementById("wrap");
@@ -381,8 +383,9 @@ function renderLoadMoreButton(state2) {
       className: ["primary", "width-100"],
       placeholder: "더보기",
       id: "load-more",
-      onClick: () => {
-        if (state2.loadMovies) renderMovieList(state2.loadMovies);
+      onClick: async () => {
+        const data = await fetchAndSetLoadingEvent(state2);
+        renderMovieItems(data.results, false);
       }
     });
     $thumbnailContainer.append(loadMoreButton);
@@ -397,14 +400,64 @@ const initMovies = () => createMovieLoader(
 const initState = () => ({
   loadMovies: initMovies()
 });
-const renderApp = (state2) => {
-  if (!state2.loadMovies) return;
+const renderApp = (data) => {
   renderHeaderAndHero();
-  renderMovieList(state2.loadMovies);
-  renderLoadMoreButton(state2);
+  const firstMovieShown = data.results[0];
+  updateHero(firstMovieShown);
+  renderMovieItems(data.results, false);
+  renderLoadMoreButton(state);
 };
-const main = () => {
+function updateHero({ poster_path, title, vote_average }) {
+  const heroImg = document.getElementById("hero-img");
+  const heroTitle = document.getElementById("hero-title");
+  const heroAverage = document.getElementById("hero-rate");
+  const topRatedContainer = document.getElementById("top-rated-container");
+  let url = `https://image.tmdb.org/t/p/original${poster_path}`;
+  if (!poster_path) url = "images/fallback.png";
+  if (heroImg) heroImg.src = url;
+  const img = document.getElementById("hero-img");
+  const heroSkeleton = document.getElementById("hero-skeleton");
+  img.addEventListener("load", () => {
+    hideElement(heroSkeleton);
+    if (heroAverage) heroAverage.innerText = vote_average;
+    if (heroTitle) heroTitle.innerText = title;
+    showElement(topRatedContainer);
+  });
+}
+const main = async () => {
   Object.assign(state, initState());
-  renderApp(state);
+  try {
+    const data = await fetchAndSetLoadingEvent(state);
+    renderApp(data);
+  } catch (error) {
+    handleSearchError();
+  }
 };
+if (!window._loadingEventRegistered) {
+  document.addEventListener("loading:start", () => {
+    const skeleton = document.querySelector(".skeleton-list");
+    const loadMore = document.getElementById("load-more");
+    if (skeleton) showElement(skeleton);
+    if (loadMore) hideElement(loadMore);
+  });
+  document.addEventListener("loading:end", (e) => {
+    const skeleton = document.querySelector(".skeleton-list");
+    const loadMore = document.getElementById("load-more");
+    if (skeleton) hideElement(skeleton);
+    if (loadMore && (!e.detail || !e.detail.isLastPage)) {
+      showElement(loadMore);
+    }
+  });
+  window._loadingEventRegistered = true;
+}
+function handleSearchError(error) {
+  const $hero = document.getElementById("hero");
+  const $thumbnailContainer = document.getElementById("thumbnail-container");
+  const $fallback = document.getElementById("fallback");
+  const $fallbackDetails = document.getElementById("fallback-details");
+  hideElement($hero);
+  hideElement($thumbnailContainer);
+  showElement($fallback);
+  $fallbackDetails.innerText = "뭔가 잘못되었어요. 인터넷 상태를 체크하신뒤 세로 고침을 해주세요!";
+}
 main();

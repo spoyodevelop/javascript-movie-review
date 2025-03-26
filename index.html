@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>영화 리뷰</title>
-    <script type="module" crossorigin src="/javascript-movie-review/assets/index-cXqYRp32.js"></script>
-    <link rel="stylesheet" crossorigin href="/javascript-movie-review/assets/index-Cj4D595x.css">
+    <script type="module" crossorigin src="/javascript-movie-review/assets/index-CZK5GKb7.js"></script>
+    <link rel="stylesheet" crossorigin href="/javascript-movie-review/assets/index-Cc1dZIHO.css">
   </head>
   <body>
     <div id="wrap">
@@ -34,6 +34,62 @@
           </div>
         </main>
       </div>
+      <dialog id="modal-dialog" class="modal">
+        <button class="close-modal" id="closeModal">
+          <img src="./images/modal_button_close.png" />
+        </button>
+        <div class="modal-container">
+          <div class="modal-image">
+            <div
+              class="skeleton-thumbnail details-thumbnail"
+              id="details-skeleton"
+            ></div>
+            <img id="details-image" class="hide" />
+          </div>
+          <div class="modal-description">
+            <h2 id="details-title">인사이드 아웃 2</h2>
+
+            <p id="details-category" class="category">
+              2024 · 모험, 애니메이션, 코미디, 드라마, 가족
+            </p>
+            <p class="rate">
+              <span class="rate-description">평균</span>
+              <img src="./images/star_filled.png" class="star" />
+
+              <span id="details-rate">7.7 </span>
+            </p>
+            <div>
+              <h2 class="">내 별점</h2>
+              <div class="star-rating-container">
+                <div class="star-rating">
+                  <input type="radio" id="star5" name="star-rating" value="5" />
+                  <label for="star5">★</label>
+                  <input type="radio" id="star4" name="star-rating" value="4" />
+                  <label for="star4">★</label>
+                  <input
+                    type="radio"
+                    id="star3"
+                    name="star-rating"
+                    value="3"
+                    checked
+                  />
+                  <label for="star3">★</label>
+                  <input type="radio" id="star2" name="star-rating" value="2" />
+                  <label for="star2">★</label>
+                  <input type="radio" id="star1" name="star-rating" value="1" />
+                  <label for="star1">★</label>
+                </div>
+                <h2 class="star-rating-details">
+                  <span id="star-rating-details">보통이에요</span>
+                  <span id="star-rating-numbers">(3/5)</span>
+                </h2>
+              </div>
+            </div>
+            <hr />
+            <p id="details-description" class="detail"></p>
+          </div>
+        </div>
+      </dialog>
 
       <footer class="footer">
         <p>&copy; 우아한테크코스 All Rights Reserved.</p>

@@ -35,43 +35,6 @@
     fetch(link.href, fetchOpts);
   }
 })();
-const Toast = {
-  showToast(message, type = "error", duration = 5e3) {
-    if (type === "info") duration = 2e3;
-    let toastContainer = document.querySelector(
-      ".toast-container"
-    );
-    if (!toastContainer) {
-      toastContainer = document.createElement("div");
-      toastContainer.className = "toast-container";
-      document.body.appendChild(toastContainer);
-    }
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    if (type === "error") {
-      message = message.replace("[ERROR]", "");
-    }
-    toast.innerHTML = message;
-    toastContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add("show");
-    }, 100);
-    setTimeout(() => {
-      toast.classList.remove("show");
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
-    toast.addEventListener("click", () => {
-      toast.classList.remove("show");
-      setTimeout(() => toast.remove(), 300);
-    });
-  },
-  resetToast() {
-    const toastContainer = document.querySelector(
-      ".toast-container"
-    );
-    if (toastContainer) toastContainer.remove();
-  }
-};
 const URLS = {
   config: "https://api.themoviedb.org/3/configuration",
   popularMovieUrl: "https://api.themoviedb.org/3/movie/popular",
@@ -108,6 +71,42 @@ const ratingNumbers = {
   "5": "(10/10)"
 };
 const defaultRating = 3;
+let showingItem = "";
+let loadMovies = null;
+function setShowingItem(value) {
+  showingItem = value;
+}
+function getShowingItem() {
+  return showingItem;
+}
+function setLoadMovies(fn) {
+  loadMovies = fn;
+}
+function getLoadMovies() {
+  return loadMovies;
+}
+function createElement(tag, props = {}) {
+  const element = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "className") {
+      if (Array.isArray(value)) {
+        element.classList.add(...value);
+      } else if (typeof value === "string") {
+        element.classList.add(value);
+      }
+      continue;
+    }
+    if (key in element) {
+      element[key] = value;
+    }
+  }
+  return element;
+}
+function createElementsFragment(elements) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(...elements);
+  return fragment;
+}
 function getPlainQuery(queryObj) {
   return queryObj instanceof URLSearchParams ? Object.fromEntries(queryObj.entries()) : queryObj;
 }
@@ -116,9 +115,11 @@ function buildQuery(plainQuery, searchTerm, page) {
 }
 const ERROR_MESSAGE = {
   FETCH_ERROR: "API 서버 상태가 좋지 않아 데이터를 가져오는데 실패했습니다.",
-  NO_DATA: "검색 값을 찾지 못했어요.",
+  NO_DATA: "검색 결과가 없습니다.",
   SERVER_ERROR: "서버에서 오류가 발생했습니다. 관리자에게 문의하세요.",
-  NETWORK_DISCONNECTED: "인터넷 연결이 끊어졌습니다. 연결을 확인해 주세요."
+  NETWORK_DISCONNECTED: "인터넷 연결이 끊어졌습니다. 연결을 확인해 주세요.",
+  FALLBACK_ERROR: "뭔가 잘못되었어요. 인터넷 상태를 체크하신뒤 세로 고침을 해주세요!",
+  RETRY_ERROR: "최대 대기 시간(1분)을 초과했습니다."
 };
 async function fetchUrl(url, queryObject, options = {}, path) {
   function buildMovieUrl(baseUrl, path2, queryObject2 = {}) {
@@ -197,28 +198,44 @@ function createMovieLoader(url, queryObj, options, onError, searchTerm) {
     return { results, isLastPage: page > pageLimit };
   };
 }
-function createElement(tag, props = {}) {
-  const element = document.createElement(tag);
-  for (const [key, value] of Object.entries(props)) {
-    if (key === "className") {
-      if (Array.isArray(value)) {
-        element.classList.add(...value);
-      } else if (typeof value === "string") {
-        element.classList.add(value);
-      }
-      continue;
+const Toast = {
+  showToast(message, type = "error", duration = 5e3) {
+    if (type === "info") duration = 2e3;
+    let toastContainer = document.querySelector(
+      ".toast-container"
+    );
+    if (!toastContainer) {
+      toastContainer = document.createElement("div");
+      toastContainer.className = "toast-container";
+      document.body.appendChild(toastContainer);
     }
-    if (key in element) {
-      element[key] = value;
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    if (type === "error") {
+      message = message.replace("[ERROR]", "");
     }
+    toast.innerHTML = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add("show");
+    }, 100);
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+    toast.addEventListener("click", () => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    });
+  },
+  resetToast() {
+    const toastContainer = document.querySelector(
+      ".toast-container"
+    );
+    if (toastContainer) toastContainer.remove();
   }
-  return element;
-}
-function createElementsFragment(elements) {
-  const fragment = document.createDocumentFragment();
-  fragment.append(...elements);
-  return fragment;
-}
+};
+const retryNotice = "서버의 상황이 좋지 않아 접속을 다시 시도하고 있어요.... 잠깐 기다려 보세요...";
 function handleConnectionError() {
   const $hero = document.getElementById("hero");
   const $thumbnailContainer = document.getElementById("thumbnail-container");
@@ -228,12 +245,12 @@ function handleConnectionError() {
   hideElement($thumbnailContainer);
   showElement($fallback);
   if ($fallbackDetails) {
-    $fallbackDetails.innerText = "뭔가 잘못되었어요. 인터넷 상태를 체크하신뒤 세로 고침을 해주세요!";
+    $fallbackDetails.innerText = ERROR_MESSAGE.FALLBACK_ERROR;
   }
 }
 function checkApiAvailability(infiniteScrollInstance2, delay = 3e3, startTime = Date.now()) {
   if (Date.now() - startTime > 6e4) {
-    Toast.showToast("최대 대기 시간(1분)을 초과했습니다.", "info", 2e3);
+    Toast.showToast(ERROR_MESSAGE.RETRY_ERROR, "error", 2e3);
     return;
   }
   setTimeout(() => {
@@ -248,28 +265,10 @@ function checkApiAvailability(infiniteScrollInstance2, delay = 3e3, startTime = 
         checkApiAvailability(infiniteScrollInstance2, delay * 2, startTime);
       }
     }).catch(() => {
-      Toast.showToast(
-        "서버의 상황이 좋지 않아 접속을 다시 시도하고 있어요.... 잠깐 기다려 보세요...",
-        "info",
-        2e3
-      );
+      Toast.showToast(retryNotice, "info", 2e3);
       checkApiAvailability(infiniteScrollInstance2, delay * 2, startTime);
     });
   }, delay);
-}
-let showingItem = "";
-let loadMovies = null;
-function setShowingItem(value) {
-  showingItem = value;
-}
-function getShowingItem() {
-  return showingItem;
-}
-function setLoadMovies(fn) {
-  loadMovies = fn;
-}
-function getLoadMovies() {
-  return loadMovies;
 }
 async function fetchAndSetLoadingEvent() {
   document.dispatchEvent(new CustomEvent("loading:start"));
@@ -287,10 +286,13 @@ async function fetchAndSetLoadingEvent() {
 }
 let isErrorHandled = false;
 async function handleSearch(searchValue) {
+  window.scrollTo({
+    top: 0
+  });
+  infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.resumeInfiniteScroll();
   isErrorHandled = false;
   setSearchResultTitle(searchValue);
   setSearchLoadingState();
-  window.scrollTo({ top: 0, behavior: "smooth" });
   setLoadMovies(
     createMovieLoader(
       URLS.searchMovieUrl,
@@ -305,8 +307,10 @@ async function handleSearch(searchValue) {
     if (data && data.results) {
       renderMovieItems(data.results, true);
     }
+    if (data.isLastPage) {
+      infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.stopInfiniteScroll();
+    }
     displaySearchResults();
-    if (infiniteScrollInstance) infiniteScrollInstance.resumeInfiniteScroll();
   } catch (error) {
     return;
   }
@@ -344,7 +348,7 @@ function handleSearchError(error) {
     const $fallbackDetails = document.getElementById("fallback-details");
     console.log(error);
     Toast.showToast(error.message, "error", 5e3);
-    if ($fallbackDetails) $fallbackDetails.innerText = "검색 결과가 없습니다.";
+    if ($fallbackDetails) $fallbackDetails.innerText = ERROR_MESSAGE.NO_DATA;
     hideElement($thumbnailContainer);
     showElement($fallback);
   }
@@ -589,7 +593,7 @@ function setupInfiniteScroll() {
     },
     {
       root: null,
-      threshold: 0.1
+      threshold: 0.7
     }
   );
   observer.observe(sentinel);
@@ -603,7 +607,7 @@ function setupInfiniteScroll() {
     }
   }
   function stopInfiniteScroll() {
-    if (infiniteScrollSuspended) {
+    if (!infiniteScrollSuspended) {
       infiniteScrollSuspended = true;
       if (!document.getElementById("infinite-scroll-sentinel") && $thumbnailContainer) {
         $thumbnailContainer.append(sentinel);
@@ -708,7 +712,7 @@ function bindStarRatingEvents() {
       if (!(radio instanceof HTMLInputElement)) {
         return;
       }
-      const ratingValue = Number(radio.value);
+      const ratingValue = radio.value;
       if (!ratingMessages[ratingValue] || !ratingNumbers[ratingValue]) {
         return;
       }

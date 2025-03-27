@@ -568,51 +568,86 @@ function updateDetails({
 }
 function setupInfiniteScroll() {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
-  if (!$thumbnailContainer) return;
+  if (!$thumbnailContainer) return null;
   const sentinel = document.createElement("div");
   sentinel.id = "infinite-scroll-sentinel";
-  $thumbnailContainer.append(sentinel);
+  $thumbnailContainer.appendChild(sentinel);
   let infiniteScrollSuspended = false;
-  const observer = new IntersectionObserver(
-    async (entries) => {
-      if (infiniteScrollSuspended) return;
-      const entry = entries[0];
-      if (entry.isIntersecting) {
-        observer.unobserve(sentinel);
-        const data = await fetchAndSetLoadingEvent();
-        if (data == null ? void 0 : data.results) {
-          renderMovieItems(data.results, false);
-        }
-        if (data == null ? void 0 : data.isLastPage) {
-          infiniteScrollSuspended = true;
-        } else {
-          $thumbnailContainer.append(sentinel);
-          observer.observe(sentinel);
-        }
+  let isFetching = false;
+  let debounceTimeoutId = null;
+  const observerCallback = (entries) => {
+    if (infiniteScrollSuspended || isFetching) return;
+    const entry = entries[0];
+    if (entry.isIntersecting) {
+      if (debounceTimeoutId) {
+        clearTimeout(debounceTimeoutId);
       }
-    },
-    {
-      root: null,
-      threshold: 0.7
+      debounceTimeoutId = window.setTimeout(async () => {
+        if (isFetching || infiniteScrollSuspended) {
+          debounceTimeoutId = null;
+          return;
+        }
+        isFetching = true;
+        observer.unobserve(sentinel);
+        try {
+          const data = await fetchAndSetLoadingEvent();
+          if (data == null ? void 0 : data.results) {
+            const scrollY = window.scrollY;
+            renderMovieItems(data.results, false);
+            window.scrollTo(0, scrollY);
+          }
+          if (data == null ? void 0 : data.isLastPage) {
+            infiniteScrollSuspended = true;
+          } else {
+            if (sentinel.parentNode) {
+              sentinel.parentNode.removeChild(sentinel);
+            }
+            $thumbnailContainer.appendChild(sentinel);
+            observer.observe(sentinel);
+          }
+        } catch (error) {
+          console.error("Fetch error:", error);
+        } finally {
+          isFetching = false;
+          debounceTimeoutId = null;
+        }
+      }, 500);
     }
-  );
+  };
+  const observer = new IntersectionObserver(observerCallback, {
+    root: null,
+    rootMargin: "100px",
+    // 약간의 여유 공간 제공
+    threshold: 0.5
+    // 임계값 조정
+  });
   observer.observe(sentinel);
   function resumeInfiniteScroll() {
-    if (infiniteScrollSuspended) {
-      infiniteScrollSuspended = false;
-      if (!document.getElementById("infinite-scroll-sentinel") && $thumbnailContainer) {
-        $thumbnailContainer.append(sentinel);
-      }
-      observer.observe(sentinel);
+    if (debounceTimeoutId) {
+      clearTimeout(debounceTimeoutId);
+      debounceTimeoutId = null;
+    }
+    infiniteScrollSuspended = false;
+    isFetching = false;
+    if (sentinel.parentNode) {
+      sentinel.parentNode.removeChild(sentinel);
+    }
+    if ($thumbnailContainer) {
+      $thumbnailContainer.appendChild(sentinel);
+      setTimeout(() => {
+        observer.observe(sentinel);
+      }, 200);
     }
   }
   function stopInfiniteScroll() {
-    if (!infiniteScrollSuspended) {
-      infiniteScrollSuspended = true;
-      if (!document.getElementById("infinite-scroll-sentinel") && $thumbnailContainer) {
-        $thumbnailContainer.append(sentinel);
-      }
-      observer.unobserve(sentinel);
+    if (debounceTimeoutId) {
+      clearTimeout(debounceTimeoutId);
+      debounceTimeoutId = null;
+    }
+    infiniteScrollSuspended = true;
+    observer.unobserve(sentinel);
+    if (sentinel.parentNode) {
+      sentinel.parentNode.removeChild(sentinel);
     }
   }
   return { observer, resumeInfiniteScroll, stopInfiniteScroll };
@@ -670,11 +705,6 @@ function bindThumbnailClickEvent() {
     if (liElement == null ? void 0 : liElement.id) {
       await handleItemClick(liElement.id);
     }
-  });
-}
-function bindOnlineEvent(infiniteScrollInstance2) {
-  window.addEventListener("online", () => {
-    infiniteScrollInstance2 == null ? void 0 : infiniteScrollInstance2.resumeInfiniteScroll();
   });
 }
 function bindDetailsImageLoadEvent() {
@@ -749,7 +779,6 @@ const bindEventListeners = () => {
   bindModalEvents();
   bindStarRatingEvents();
   bindDetailsImageLoadEvent();
-  bindOnlineEvent(infiniteScrollInstance);
 };
 const main = async () => {
   try {

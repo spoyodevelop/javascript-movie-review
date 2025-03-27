@@ -1,4 +1,3 @@
-var _a;
 (function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
@@ -36,7 +35,7 @@ var _a;
     fetch(link.href, fetchOpts);
   }
 })();
-const Toast$1 = {
+const Toast = {
   showToast(message, type = "error", duration = 5e3) {
     if (type === "info") duration = 2e3;
     let toastContainer = document.querySelector(
@@ -74,8 +73,10 @@ const Toast$1 = {
   }
 };
 const URLS = {
+  config: "https://api.themoviedb.org/3/configuration",
   popularMovieUrl: "https://api.themoviedb.org/3/movie/popular",
-  searchMovieUrl: "https://api.themoviedb.org/3/search/movie"
+  searchMovieUrl: "https://api.themoviedb.org/3/search/movie",
+  detailsMovieUrl: "https://api.themoviedb.org/3/movie"
 };
 const defaultOptions = {
   headers: {
@@ -93,19 +94,20 @@ const paths = {
   star_empty: "./images/star_empty.png"
 };
 const ratingMessages = {
-  1: "최악이예요",
-  2: "별로예요",
-  3: "보통이에요",
-  4: "재미있어요",
-  5: "명작이에요"
+  "1": "최악이예요",
+  "2": "별로예요",
+  "3": "보통이에요",
+  "4": "재미있어요",
+  "5": "명작이에요"
 };
 const ratingNumbers = {
-  1: "(2/10)",
-  2: "(4/10)",
-  3: "(6/10)",
-  4: "(8/10)",
-  5: "(10/10)"
+  "1": "(2/10)",
+  "2": "(4/10)",
+  "3": "(6/10)",
+  "4": "(8/10)",
+  "5": "(10/10)"
 };
+const defaultRating = 3;
 function getPlainQuery(queryObj) {
   return queryObj instanceof URLSearchParams ? Object.fromEntries(queryObj.entries()) : queryObj;
 }
@@ -171,7 +173,7 @@ async function fetchMovies(url, queryObject, options, onError, path) {
     } else {
       throw error;
     }
-    return { results: [], total_pages: 0, page: 1, total_results: 0 };
+    return { id: -1, results: [], total_pages: 0, page: 1, total_results: 0 };
   }
 }
 function createMovieLoader(url, queryObj, options, onError, searchTerm) {
@@ -195,10 +197,6 @@ function createMovieLoader(url, queryObj, options, onError, searchTerm) {
     return { results, isLastPage: page > pageLimit };
   };
 }
-const state = {
-  loadMovies: null,
-  heroMovie: null
-};
 function createElement(tag, props = {}) {
   const element = document.createElement(tag);
   for (const [key, value] of Object.entries(props)) {
@@ -229,41 +227,89 @@ function handleConnectionError() {
   hideElement($hero);
   hideElement($thumbnailContainer);
   showElement($fallback);
-  $fallbackDetails.innerText = "뭔가 잘못되었어요. 인터넷 상태를 체크하신뒤 세로 고침을 해주세요!";
+  if ($fallbackDetails) {
+    $fallbackDetails.innerText = "뭔가 잘못되었어요. 인터넷 상태를 체크하신뒤 세로 고침을 해주세요!";
+  }
 }
-function checkApiAvailability(infiniteScrollInstance2, delay = 3e3) {
+function checkApiAvailability(infiniteScrollInstance2, delay = 3e3, startTime = Date.now()) {
+  if (Date.now() - startTime > 6e4) {
+    Toast.showToast("최대 대기 시간(1분)을 초과했습니다.", "info", 2e3);
+    return;
+  }
   setTimeout(() => {
-    fetch("https://api.themoviedb.org/3/movie/popular").then((response) => {
+    fetch(URLS.config, {
+      ...defaultOptions,
+      method: "GET"
+    }).then((response) => {
       if (response.ok) {
-        infiniteScrollInstance2.resumeInfiniteScroll();
+        if (infiniteScrollInstance2)
+          infiniteScrollInstance2.resumeInfiniteScroll();
       } else {
-        checkApiAvailability(delay * 2);
+        checkApiAvailability(infiniteScrollInstance2, delay * 2, startTime);
       }
-    }).catch((error) => {
+    }).catch(() => {
       Toast.showToast(
-        "서버의 상황이 좋지 않아 접속을 다시 시도를 하고 있어요.... 잠깐 기다려 보세요...",
+        "서버의 상황이 좋지 않아 접속을 다시 시도하고 있어요.... 잠깐 기다려 보세요...",
         "info",
         2e3
       );
-      checkApiAvailability(delay * 2);
+      checkApiAvailability(infiniteScrollInstance2, delay * 2, startTime);
     });
   }, delay);
 }
+let showingItem = "";
+let loadMovies = null;
+function setShowingItem(value) {
+  showingItem = value;
+}
+function getShowingItem() {
+  return showingItem;
+}
+function setLoadMovies(fn) {
+  loadMovies = fn;
+}
+function getLoadMovies() {
+  return loadMovies;
+}
+async function fetchAndSetLoadingEvent() {
+  document.dispatchEvent(new CustomEvent("loading:start"));
+  const loadMovies2 = getLoadMovies();
+  let data = null;
+  if (typeof loadMovies2 === "function") {
+    data = await loadMovies2();
+  }
+  document.dispatchEvent(
+    new CustomEvent("loading:end", {
+      detail: { isLastPage: (data == null ? void 0 : data.isLastPage) ?? false }
+    })
+  );
+  return data;
+}
+let isErrorHandled = false;
 async function handleSearch(searchValue) {
+  isErrorHandled = false;
   setSearchResultTitle(searchValue);
   setSearchLoadingState();
   window.scrollTo({ top: 0, behavior: "smooth" });
-  state.loadMovies = createMovieLoader(
-    URLS.searchMovieUrl,
-    defaultQueryObject,
-    defaultOptions,
-    (error) => handleSearchError(error),
-    searchValue
+  setLoadMovies(
+    createMovieLoader(
+      URLS.searchMovieUrl,
+      defaultQueryObject,
+      defaultOptions,
+      (error) => handleSearchError(error),
+      searchValue
+    )
   );
-  infiniteScrollInstance.resumeInfiniteScroll();
-  const $list = document.getElementById("thumbnail-list");
-  $list.innerHTML = "";
-  displaySearchResults();
+  try {
+    const data = await fetchAndSetLoadingEvent();
+    if (data && data.results) {
+      renderMovieItems(data.results, true);
+    }
+    displaySearchResults();
+    if (infiniteScrollInstance) infiniteScrollInstance.resumeInfiniteScroll();
+  } catch (error) {
+    return;
+  }
 }
 function setSearchResultTitle(searchValue) {
   const description = document.getElementById("description");
@@ -286,15 +332,19 @@ function displaySearchResults() {
   showElement($thumbnailList);
 }
 function handleSearchError(error) {
+  if (isErrorHandled) return;
+  isErrorHandled = true;
   if (error.message !== ERROR_MESSAGE.NO_DATA) {
-    Toast$1.showToast(error.message, "error", 3e3);
-    checkApiAvailability(3e3);
+    Toast.showToast(error.message, "error", 3e3);
+    checkApiAvailability(infiniteScrollInstance, 3e3);
   } else {
+    if (infiniteScrollInstance) infiniteScrollInstance.stopInfiniteScroll();
     const $thumbnailContainer = document.getElementById("thumbnail-container");
     const $fallback = document.getElementById("fallback");
     const $fallbackDetails = document.getElementById("fallback-details");
-    if (error instanceof Error) Toast$1.showToast(error.message, "error", 5e3);
-    $fallbackDetails.innerText = "검색 결과가 없습니다.";
+    console.log(error);
+    Toast.showToast(error.message, "error", 5e3);
+    if ($fallbackDetails) $fallbackDetails.innerText = "검색 결과가 없습니다.";
     hideElement($thumbnailContainer);
     showElement($fallback);
   }
@@ -332,7 +382,7 @@ function Header() {
     handleSearch(searchValue);
   });
   $logo.addEventListener("click", () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
     location.reload();
   });
   $searchButton.appendChild($searchImg);
@@ -404,17 +454,18 @@ function hideElement(element) {
   element == null ? void 0 : element.classList.add("hide");
 }
 function hideImgSkeleton(event) {
-  var _a2, _b;
+  var _a, _b;
   const img = event.target;
   if (!img) return;
   showElement(img);
-  const skeleton = (_b = (_a2 = img.parentElement) == null ? void 0 : _a2.parentElement) == null ? void 0 : _b.querySelector(
+  const skeleton = (_b = (_a = img.parentElement) == null ? void 0 : _a.parentElement) == null ? void 0 : _b.querySelector(
     ".skeleton-thumbnail"
   );
   skeleton == null ? void 0 : skeleton.remove();
 }
 function renderMovieItems(results, reset) {
   const $list = document.getElementById("thumbnail-list");
+  if (reset && $list) $list.innerHTML = "";
   const movieItems = results.map((result) => {
     const { id, title, poster_path, vote_average } = result;
     return MovieItem({
@@ -445,16 +496,18 @@ function updateHero({ poster_path, title, vote_average }) {
   if (heroImg) heroImg.src = url;
   const img = document.getElementById("hero-img");
   const heroSkeleton = document.getElementById("hero-skeleton");
-  img.addEventListener("load", () => {
-    hideElement(heroSkeleton);
-    if (heroAverage) heroAverage.innerText = Number(vote_average).toFixed(1);
-    if (heroTitle) heroTitle.innerText = title;
-    showElement(topRatedContainer);
-  });
-  const modal2 = document.getElementById("modal-dialog");
-  heroButton.addEventListener("click", () => {
-    modal2.showModal();
-  });
+  if (img)
+    img.addEventListener("load", () => {
+      hideElement(heroSkeleton);
+      if (heroAverage) heroAverage.innerText = Number(vote_average).toFixed(1);
+      if (heroTitle) heroTitle.innerText = title;
+      showElement(topRatedContainer);
+    });
+  const modal = document.getElementById("modal-dialog");
+  if (heroButton)
+    heroButton.addEventListener("click", () => {
+      modal.showModal();
+    });
 }
 function updateDetails({
   poster_path,
@@ -465,14 +518,24 @@ function updateDetails({
   genres,
   id
 }) {
-  const detailsImage = document.getElementById("details-image");
+  const detailsImage = document.getElementById(
+    "details-image"
+  );
   const detailsTitle = document.getElementById("details-title");
-  const detailsCategory = document.getElementById("details-category");
+  const detailsCategory = document.getElementById(
+    "details-category"
+  );
   const detailsRate = document.getElementById("details-rate");
-  const detailsDescription = document.getElementById("details-description");
-  const starRatingDetails = document.getElementById("star-rating-details");
-  const starRatingNumbers = document.getElementById("star-rating-numbers");
-  const savedRating = localStorage.getItem(id);
+  const detailsDescription = document.getElementById(
+    "details-description"
+  );
+  const starRatingDetails = document.getElementById(
+    "star-rating-details"
+  );
+  const starRatingNumbers = document.getElementById(
+    "star-rating-numbers"
+  );
+  const savedRating = localStorage.getItem(String(id));
   if (savedRating) {
     const input = document.querySelector(
       `input[name="star-rating"][value="${savedRating}"]`
@@ -481,30 +544,25 @@ function updateDetails({
     starRatingDetails.innerText = ratingMessages[savedRating];
     starRatingNumbers.innerText = ratingNumbers[savedRating];
   } else {
-    starRatingDetails.innerText = ratingMessages[3];
-    starRatingNumbers.innerText = ratingNumbers[3];
+    starRatingDetails.innerText = ratingMessages[defaultRating];
+    starRatingNumbers.innerText = ratingNumbers[defaultRating];
     document.getElementById("star3").checked = true;
   }
   let categoryNames = "";
-  if (genres)
+  if (genres) {
     categoryNames = `${new Date(release_date).getFullYear()} · ${genres.map((genre) => genre.name).join(", ")} `;
+  }
   let imgUrl = "./images/fallback_no_movies.png";
-  if (poster_path) imgUrl = "https://image.tmdb.org/t/p/original" + poster_path;
+  if (poster_path) {
+    imgUrl = `https://image.tmdb.org/t/p/original${poster_path}`;
+  }
   detailsTitle.innerText = title;
   detailsRate.innerText = Number(vote_average).toFixed(1);
   detailsCategory.innerText = categoryNames;
   detailsDescription.innerText = overview;
   detailsImage.src = imgUrl;
 }
-async function fetchAndSetLoadingEvent(state2) {
-  document.dispatchEvent(new CustomEvent("loading:start"));
-  const data = await state2.loadMovies();
-  document.dispatchEvent(
-    new CustomEvent("loading:end", { detail: { isLastPage: data.isLastPage } })
-  );
-  return data;
-}
-function setupInfiniteScroll(state2) {
+function setupInfiniteScroll() {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
   if (!$thumbnailContainer) return;
   const sentinel = document.createElement("div");
@@ -517,9 +575,11 @@ function setupInfiniteScroll(state2) {
       const entry = entries[0];
       if (entry.isIntersecting) {
         observer.unobserve(sentinel);
-        const data = await fetchAndSetLoadingEvent(state2);
-        renderMovieItems(data.results);
-        if (data.isLastPage) {
+        const data = await fetchAndSetLoadingEvent();
+        if (data == null ? void 0 : data.results) {
+          renderMovieItems(data.results, false);
+        }
+        if (data == null ? void 0 : data.isLastPage) {
           infiniteScrollSuspended = true;
         } else {
           $thumbnailContainer.append(sentinel);
@@ -529,14 +589,14 @@ function setupInfiniteScroll(state2) {
     },
     {
       root: null,
-      threshold: 0.4
+      threshold: 0.1
     }
   );
   observer.observe(sentinel);
   function resumeInfiniteScroll() {
     if (infiniteScrollSuspended) {
       infiniteScrollSuspended = false;
-      if (!document.getElementById("infinite-scroll-sentinel")) {
+      if (!document.getElementById("infinite-scroll-sentinel") && $thumbnailContainer) {
         $thumbnailContainer.append(sentinel);
       }
       observer.observe(sentinel);
@@ -545,7 +605,7 @@ function setupInfiniteScroll(state2) {
   function stopInfiniteScroll() {
     if (infiniteScrollSuspended) {
       infiniteScrollSuspended = true;
-      if (!document.getElementById("infinite-scroll-sentinel")) {
+      if (!document.getElementById("infinite-scroll-sentinel") && $thumbnailContainer) {
         $thumbnailContainer.append(sentinel);
       }
       observer.unobserve(sentinel);
@@ -553,110 +613,150 @@ function setupInfiniteScroll(state2) {
   }
   return { observer, resumeInfiniteScroll, stopInfiniteScroll };
 }
-let infiniteScrollInstance = null;
-let showingItem = 0;
-const initMovies = () => createMovieLoader(
-  URLS.popularMovieUrl,
-  defaultQueryObject,
-  defaultOptions,
-  handleError
-);
-const handleError = (error) => {
-  Toast$1.showToast(error.message, "error", 5e3);
-  checkApiAvailability(infiniteScrollInstance);
-};
-const initState = () => ({
-  loadMovies: initMovies()
-});
-const renderApp = (data) => {
-  renderHeaderAndHero();
-  const firstMovieShown = data.results[0];
-  showingItem = data.results[0].id;
-  updateHero(firstMovieShown);
-  updateDetails(firstMovieShown);
-  renderMovieItems(data.results);
-};
-const main = async () => {
-  Object.assign(state, initState());
-  try {
-    const data = await fetchAndSetLoadingEvent(state);
-    infiniteScrollInstance = setupInfiniteScroll(state);
-    renderApp(data);
-  } catch {
-    handleConnectionError();
-  }
-};
-if (!window._loadingEventRegistered) {
-  document.addEventListener("loading:start", () => {
-    const skeleton = document.querySelector(".skeleton-list");
-    const loadMore = document.getElementById("load-more");
-    if (skeleton) showElement(skeleton);
-    if (loadMore) hideElement(loadMore);
-  });
-  document.addEventListener("loading:end", (e) => {
-    const skeleton = document.querySelector(".skeleton-list");
-    const loadMore = document.getElementById("load-more");
-    if (skeleton) hideElement(skeleton);
-    if (loadMore && (!e.detail || !e.detail.isLastPage)) {
-      showElement(loadMore);
-    }
-  });
-  window._loadingEventRegistered = true;
-}
-(_a = document.getElementById("thumbnail-list")) == null ? void 0 : _a.addEventListener("click", ({ target }) => {
-  const { id } = (target == null ? void 0 : target.closest("li")) ?? {};
-  if (id) {
-    handleItemClick(id);
-  }
-});
-window.addEventListener("online", () => {
-  infiniteScrollInstance.resumeInfiniteScroll();
-});
 async function handleItemClick(id) {
-  const detailsUrl = "https://api.themoviedb.org/3/movie";
   try {
     const result = await fetchUrl(
-      detailsUrl,
+      URLS.detailsMovieUrl,
       defaultQueryObject,
       defaultOptions,
       id
     );
-    const modal2 = document.getElementById("modal-dialog");
     updateDetails(result);
     updateHero(result);
+    setShowingItem(id);
     const skeleton = document.getElementById("details-skeleton");
     const detailsImage = document.getElementById("details-image");
     showElement(skeleton);
     hideElement(detailsImage);
-    showingItem = id;
-    modal2.showModal();
+    const modal = document.getElementById(
+      "modal-dialog"
+    );
+    if (modal) {
+      modal.showModal();
+    }
   } catch (error) {
-    Toast$1.showToast(error.message, "error", 5e3);
+    if (error instanceof Error) Toast.showToast(error.message, "error", 5e3);
   }
 }
-document.getElementById("details-image").addEventListener("load", () => {
-  const skeleton = document.getElementById("details-skeleton");
-  const detailsImage = document.getElementById("details-image");
-  hideElement(skeleton);
-  showElement(detailsImage);
-});
-const modal = document.getElementById("modal-dialog");
-document.getElementById("closeModal").addEventListener("click", () => {
-  modal.close();
-});
-modal.addEventListener("click", (event) => {
-  if (event.target === modal) {
-    modal.close();
+function bindLoadingEvents() {
+  if (!window._loadingEventRegistered) {
+    document.addEventListener("loading:start", () => {
+      const skeleton = document.querySelector(".skeleton-list");
+      const loadMore = document.getElementById("load-more");
+      if (skeleton) showElement(skeleton);
+      if (loadMore) hideElement(loadMore);
+    });
+    document.addEventListener("loading:end", (e) => {
+      const skeleton = document.querySelector(".skeleton-list");
+      const loadMore = document.getElementById("load-more");
+      const customEvent = e;
+      if (skeleton) hideElement(skeleton);
+      if (loadMore && (!customEvent.detail || !customEvent.detail.isLastPage)) {
+        showElement(loadMore);
+      }
+    });
+    window._loadingEventRegistered = true;
   }
-});
-const radios = document.querySelectorAll('input[name="star-rating"]');
-radios.forEach((radio) => {
-  radio.addEventListener("change", () => {
-    const starRatingDetails = document.getElementById("star-rating-details");
-    const starRatingNumbers = document.getElementById("star-rating-numbers");
-    starRatingDetails.innerText = ratingMessages[radio.value];
-    starRatingNumbers.innerText = ratingNumbers[radio.value];
-    localStorage.setItem(showingItem, radio.value);
+}
+function bindThumbnailClickEvent() {
+  const thumbnailList = document.getElementById("thumbnail-list");
+  thumbnailList == null ? void 0 : thumbnailList.addEventListener("click", async (event) => {
+    const target = event.target;
+    const liElement = target == null ? void 0 : target.closest("li");
+    if (liElement == null ? void 0 : liElement.id) {
+      await handleItemClick(liElement.id);
+    }
   });
-});
+}
+function bindOnlineEvent(infiniteScrollInstance2) {
+  window.addEventListener("online", () => {
+    infiniteScrollInstance2 == null ? void 0 : infiniteScrollInstance2.resumeInfiniteScroll();
+  });
+}
+function bindDetailsImageLoadEvent() {
+  const detailsImage = document.getElementById("details-image");
+  if (!detailsImage) return;
+  detailsImage.addEventListener("load", () => {
+    const skeleton = document.getElementById("details-skeleton");
+    hideElement(skeleton);
+    showElement(detailsImage);
+  });
+}
+function bindModalEvents() {
+  const modal = document.getElementById("modal-dialog");
+  if (!(modal instanceof HTMLDialogElement)) return;
+  const closeModalBtn = document.getElementById("closeModal");
+  if (!closeModalBtn) return;
+  closeModalBtn.addEventListener("click", () => {
+    modal.close();
+  });
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      modal.close();
+    }
+  });
+}
+function bindStarRatingEvents() {
+  const radios = document.querySelectorAll('input[name="star-rating"]');
+  for (const radio of radios) {
+    radio.addEventListener("change", () => {
+      const starRatingDetails = document.getElementById("star-rating-details");
+      const starRatingNumbers = document.getElementById("star-rating-numbers");
+      if (!(starRatingDetails instanceof HTMLElement) || !(starRatingNumbers instanceof HTMLElement)) {
+        return;
+      }
+      if (!(radio instanceof HTMLInputElement)) {
+        return;
+      }
+      const ratingValue = Number(radio.value);
+      if (!ratingMessages[ratingValue] || !ratingNumbers[ratingValue]) {
+        return;
+      }
+      starRatingDetails.innerText = ratingMessages[ratingValue];
+      starRatingNumbers.innerText = ratingNumbers[ratingValue];
+      localStorage.setItem(getShowingItem(), String(ratingValue));
+    });
+  }
+}
+let infiniteScrollInstance = null;
+const initMovies = () => {
+  return createMovieLoader(
+    URLS.popularMovieUrl,
+    defaultQueryObject,
+    defaultOptions,
+    handleError
+  );
+};
+const handleError = (error) => {
+  Toast.showToast(error.message, "error", 5e3);
+  checkApiAvailability(infiniteScrollInstance);
+};
+const renderApp = (data) => {
+  renderHeaderAndHero();
+  const firstMovieShown = data.results[0];
+  setShowingItem(data.results[0].id);
+  updateHero(firstMovieShown);
+  updateDetails(firstMovieShown);
+  renderMovieItems(data.results, false);
+};
+const bindEventListeners = () => {
+  bindLoadingEvents();
+  bindThumbnailClickEvent();
+  bindModalEvents();
+  bindStarRatingEvents();
+  bindDetailsImageLoadEvent();
+  bindOnlineEvent(infiniteScrollInstance);
+};
+const main = async () => {
+  try {
+    const loadMovies2 = initMovies();
+    setLoadMovies(loadMovies2);
+    const data = await fetchAndSetLoadingEvent();
+    infiniteScrollInstance = setupInfiniteScroll();
+    renderApp(data);
+    bindEventListeners();
+  } catch (error) {
+    handleConnectionError();
+  }
+};
 main();

@@ -341,7 +341,6 @@ function handleSearchError(error) {
     const $thumbnailContainer = document.getElementById("thumbnail-container");
     const $fallback = document.getElementById("fallback");
     const $fallbackDetails = document.getElementById("fallback-details");
-    console.log(error);
     Toast.showToast(error.message, "error", 5e3);
     if ($fallbackDetails) $fallbackDetails.innerText = ERROR_MESSAGE.NO_DATA;
     hideElement($thumbnailContainer);

@@ -39,7 +39,8 @@ const URLS = {
   config: "https://api.themoviedb.org/3/configuration",
   popularMovieUrl: "https://api.themoviedb.org/3/movie/popular",
   searchMovieUrl: "https://api.themoviedb.org/3/search/movie",
-  detailsMovieUrl: "https://api.themoviedb.org/3/movie"
+  detailsMovieUrl: "https://api.themoviedb.org/3/movie",
+  imgW500: "https://image.tmdb.org/t/p/w500"
 };
 const defaultOptions = {
   headers: {
@@ -431,7 +432,7 @@ function Hero() {
 }
 function MovieItem({ id, src, title, rate, onload }) {
   const $li = createElement("li", { id });
-  let url = `https://image.tmdb.org/t/p/w500${src}`;
+  let url = `${URLS.imgW500}${src}`;
   if (!src) url = "images/fallback.png";
   $li.innerHTML = `
       <div class="skeleton-thumbnail thumbnail"></div>

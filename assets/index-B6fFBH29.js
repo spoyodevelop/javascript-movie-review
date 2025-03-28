@@ -593,8 +593,8 @@ function setupInfiniteScroll() {
           const data = await fetchAndSetLoadingEvent();
           if (data == null ? void 0 : data.results) {
             const scrollY = window.scrollY;
+            window.scrollTo(0, scrollY + 100);
             renderMovieItems(data.results, false);
-            window.scrollTo(0, scrollY + 10);
           }
           if (data == null ? void 0 : data.isLastPage) {
             infiniteScrollSuspended = true;

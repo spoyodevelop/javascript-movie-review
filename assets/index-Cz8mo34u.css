@@ -590,11 +590,14 @@ p.rate {
   gap: 1rem;
   border-radius: 2rem;
   padding: 1rem;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
 }
 .header.dim {
   backdrop-filter: blur(2px);
-  background-color: #39414d6d;
+  background-color: rgba(57, 65, 77, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 .search-bar {
   display: flex;

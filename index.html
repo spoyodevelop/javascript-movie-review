@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>영화 리뷰</title>
-    <script type="module" crossorigin src="/javascript-movie-review/assets/index-C-r8CChA.js"></script>
-    <link rel="stylesheet" crossorigin href="/javascript-movie-review/assets/index-48BjHVC2.css">
+    <script type="module" crossorigin src="/javascript-movie-review/assets/index-BU37DqaE.js"></script>
+    <link rel="stylesheet" crossorigin href="/javascript-movie-review/assets/index-sU5396wi.css">
   </head>
   <body>
     <div id="wrap">
@@ -15,18 +15,15 @@
           <section class="thumbnail-container" id="thumbnail-container">
             <h2 id="description">지금 인기 있는 영화</h2>
             <ul class="thumbnail-list" id="thumbnail-list"></ul>
-            <ul class="thumbnail-list skeleton-list">
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-              <li><div class="skeleton-thumbnail thumbnail"></div></li>
-            </ul>
+            <div class="thumbnail-list skeleton-list loading">
+              <div class="orbit-spinner" style="scale: 2">
+                <div class="planet"></div>
+                <div class="orbit">
+                  <div class="satellite satellite-1"></div>
+                  <div class="satellite satellite-2"></div>
+                </div>
+              </div>
+            </div>
           </section>
           <div class="fallback-div hide" id="fallback">
             <img src="./images/fallback_no_movies.png" alt="머리 아픈 행성이" />

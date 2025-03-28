@@ -280,11 +280,27 @@ async function fetchAndSetLoadingEvent() {
   return data;
 }
 let isErrorHandled = false;
-async function handleSearch(searchValue) {
-  window.scrollTo({
-    top: 0
+function scrollToTop() {
+  return new Promise((resolve) => {
+    const onScroll = () => {
+      if (window.scrollY === 0) {
+        window.removeEventListener("scroll", onScroll);
+        resolve();
+      }
+    };
+    window.addEventListener("scroll", onScroll);
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+    if (window.scrollY === 0) {
+      window.removeEventListener("scroll", onScroll);
+      resolve();
+    }
   });
-  infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.resumeInfiniteScroll();
+}
+async function handleSearch(searchValue) {
+  await scrollToTop();
   isErrorHandled = false;
   setSearchResultTitle(searchValue);
   setSearchLoadingState();
@@ -297,13 +313,13 @@ async function handleSearch(searchValue) {
       searchValue
     )
   );
+  infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.stopInfiniteScroll();
   try {
     const data = await fetchAndSetLoadingEvent();
-    if (data && data.results) {
-      renderMovieItems(data.results, true);
-    }
-    if (data.isLastPage) {
-      infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.stopInfiniteScroll();
+    if (data && data.results) renderMovieItems(data.results, true);
+    if (data.isLastPage) infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.stopInfiniteScroll();
+    else {
+      infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.resumeInfiniteScroll();
     }
     displaySearchResults();
   } catch (error) {
@@ -467,17 +483,15 @@ function renderMovieItems(results, reset) {
     $list.innerHTML = "";
   }
   for (const result of results) {
-    if (!document.getElementById(result.id)) {
-      const { id, title, poster_path, vote_average } = result;
-      const movieItem = MovieItem({
-        id,
-        title,
-        src: poster_path,
-        rate: vote_average,
-        onload: hideImgSkeleton
-      });
-      $list == null ? void 0 : $list.appendChild(movieItem);
-    }
+    const { id, title, poster_path, vote_average } = result;
+    const movieItem = MovieItem({
+      id,
+      title,
+      src: poster_path,
+      rate: vote_average,
+      onload: hideImgSkeleton
+    });
+    $list == null ? void 0 : $list.appendChild(movieItem);
   }
 }
 function renderHeaderAndHero() {
@@ -614,7 +628,7 @@ function setupInfiniteScroll() {
   };
   const observer = new IntersectionObserver(observerCallback, {
     root: null,
-    rootMargin: "100px",
+    rootMargin: "20px",
     threshold: 0.2
   });
   observer.observe(sentinel);
@@ -630,9 +644,7 @@ function setupInfiniteScroll() {
     }
     if ($thumbnailContainer) {
       $thumbnailContainer.appendChild(sentinel);
-      setTimeout(() => {
-        observer.observe(sentinel);
-      }, 200);
+      observer.observe(sentinel);
     }
   }
   function stopInfiniteScroll() {

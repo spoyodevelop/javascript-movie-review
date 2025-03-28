@@ -594,7 +594,7 @@ function setupInfiniteScroll() {
           if (data == null ? void 0 : data.results) {
             const scrollY = window.scrollY;
             renderMovieItems(data.results, false);
-            window.scrollTo(0, scrollY);
+            window.scrollTo(0, scrollY + 10);
           }
           if (data == null ? void 0 : data.isLastPage) {
             infiniteScrollSuspended = true;
@@ -611,15 +611,13 @@ function setupInfiniteScroll() {
           isFetching = false;
           debounceTimeoutId = null;
         }
-      }, 500);
+      }, 300);
     }
   };
   const observer = new IntersectionObserver(observerCallback, {
     root: null,
     rootMargin: "100px",
-    // 약간의 여유 공간 제공
-    threshold: 0.5
-    // 임계값 조정
+    threshold: 0.2
   });
   observer.observe(sentinel);
   function resumeInfiniteScroll() {

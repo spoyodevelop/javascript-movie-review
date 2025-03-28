@@ -102,11 +102,6 @@ function createElement(tag, props = {}) {
   }
   return element;
 }
-function createElementsFragment(elements) {
-  const fragment = document.createDocumentFragment();
-  fragment.append(...elements);
-  return fragment;
-}
 function getPlainQuery(queryObj) {
   return queryObj instanceof URLSearchParams ? Object.fromEntries(queryObj.entries()) : queryObj;
 }
@@ -469,18 +464,22 @@ function hideImgSkeleton(event) {
 }
 function renderMovieItems(results, reset) {
   const $list = document.getElementById("thumbnail-list");
-  if (reset && $list) $list.innerHTML = "";
-  const movieItems = results.map((result) => {
-    const { id, title, poster_path, vote_average } = result;
-    return MovieItem({
-      id,
-      title,
-      src: poster_path,
-      rate: vote_average,
-      onload: hideImgSkeleton
-    });
-  });
-  $list == null ? void 0 : $list.appendChild(createElementsFragment(movieItems));
+  if (reset && $list) {
+    $list.innerHTML = "";
+  }
+  for (const result of results) {
+    if (!document.getElementById(result.id)) {
+      const { id, title, poster_path, vote_average } = result;
+      const movieItem = MovieItem({
+        id,
+        title,
+        src: poster_path,
+        rate: vote_average,
+        onload: hideImgSkeleton
+      });
+      $list == null ? void 0 : $list.appendChild(movieItem);
+    }
+  }
 }
 function renderHeaderAndHero() {
   const $wrap = document.getElementById("wrap");
@@ -593,8 +592,8 @@ function setupInfiniteScroll() {
           const data = await fetchAndSetLoadingEvent();
           if (data == null ? void 0 : data.results) {
             const scrollY = window.scrollY;
-            window.scrollTo(0, scrollY + 100);
             renderMovieItems(data.results, false);
+            window.scrollTo(0, scrollY + 10);
           }
           if (data == null ? void 0 : data.isLastPage) {
             infiniteScrollSuspended = true;

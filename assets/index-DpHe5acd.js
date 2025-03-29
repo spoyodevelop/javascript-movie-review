@@ -802,6 +802,16 @@ function bindStarRatingEvents() {
     });
   }
 }
+function bindHeaderScrollEvent() {
+  window.addEventListener("scroll", () => {
+    const header = document.querySelector(".header");
+    if (window.scrollY > 50) {
+      header == null ? void 0 : header.classList.add("dim");
+    } else {
+      header == null ? void 0 : header.classList.remove("dim");
+    }
+  });
+}
 let infiniteScrollInstance = null;
 const initMovies = () => {
   return createMovieLoader(
@@ -829,6 +839,7 @@ const bindEventListeners = () => {
   bindModalEvents();
   bindStarRatingEvents();
   bindDetailsImageLoadEvent();
+  bindHeaderScrollEvent();
 };
 const main = async () => {
   try {
@@ -842,12 +853,4 @@ const main = async () => {
     handleConnectionError();
   }
 };
-window.addEventListener("scroll", () => {
-  const header = document.querySelector(".header");
-  if (window.scrollY > 50) {
-    header.classList.add("dim");
-  } else {
-    header.classList.remove("dim");
-  }
-});
 main();

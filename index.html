@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>영화 리뷰</title>
-    <script type="module" crossorigin src="/javascript-movie-review/assets/index-CujaUwVj.js"></script>
-    <link rel="stylesheet" crossorigin href="/javascript-movie-review/assets/index-Dr_zGeWq.css">
+    <script type="module" crossorigin src="/javascript-movie-review/assets/index-nZn0MmVG.js"></script>
+    <link rel="stylesheet" crossorigin href="/javascript-movie-review/assets/index-BPwgV5CT.css">
   </head>
   <body>
     <div id="wrap">
@@ -32,10 +32,19 @@
         </main>
       </div>
       <dialog id="modal-dialog" class="modal">
+        <div class="detail-loading" id="detail-loading">
+          <div class="orbit-spinner" style="scale: 2">
+            <div class="planet"></div>
+            <div class="orbit">
+              <div class="satellite satellite-1"></div>
+              <div class="satellite satellite-2"></div>
+            </div>
+          </div>
+        </div>
         <button class="close-modal" id="closeModal">
           <img src="./images/modal_button_close.png" />
         </button>
-        <div class="modal-container">
+        <div class="modal-container" id="modal-container">
           <div class="modal-image">
             <div
               class="skeleton-thumbnail details-thumbnail"

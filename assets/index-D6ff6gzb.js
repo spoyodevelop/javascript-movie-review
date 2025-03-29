@@ -516,9 +516,32 @@ function updateHero({ poster_path, title, vote_average }) {
       showElement(topRatedContainer);
     });
   const modal = document.getElementById("modal-dialog");
-  if (heroButton)
+  if (heroButton && modal)
     heroButton.addEventListener("click", () => {
       modal.showModal();
+      const loadingSpinner = document.getElementById("detail-loading");
+      const modalContainer = document.getElementById("modal-container");
+      if (loadingSpinner && modalContainer) {
+        hideElement(loadingSpinner);
+        showElement(modalContainer);
+      }
+      const detailsSkeleton = document.getElementById("details-skeleton");
+      const detailsImage = document.getElementById(
+        "details-image"
+      );
+      if (detailsSkeleton && detailsImage) {
+        showElement(detailsSkeleton);
+        hideElement(detailsImage);
+        if (detailsImage.complete) {
+          hideElement(detailsSkeleton);
+          showElement(detailsImage);
+        } else {
+          detailsImage.onload = () => {
+            hideElement(detailsSkeleton);
+            showElement(detailsImage);
+          };
+        }
+      }
     });
 }
 function updateDetails({
@@ -547,6 +570,7 @@ function updateDetails({
   const starRatingNumbers = document.getElementById(
     "star-rating-numbers"
   );
+  const detailsSkeleton = document.getElementById("details-skeleton");
   const savedRating = localStorage.getItem(String(id));
   if (savedRating) {
     const input = document.querySelector(
@@ -572,7 +596,17 @@ function updateDetails({
   detailsRate.innerText = Number(vote_average).toFixed(1);
   detailsCategory.innerText = categoryNames;
   detailsDescription.innerText = overview;
+  hideElement(detailsImage);
+  if (detailsSkeleton) {
+    showElement(detailsSkeleton);
+  }
   detailsImage.src = imgUrl;
+  detailsImage.onload = () => {
+    if (detailsSkeleton) {
+      hideElement(detailsSkeleton);
+    }
+    showElement(detailsImage);
+  };
 }
 function setupInfiniteScroll() {
   const $thumbnailContainer = document.getElementById("thumbnail-container");
@@ -666,17 +700,9 @@ async function handleItemClick(id) {
     }
     const loadingSpinner = document.getElementById("detail-loading");
     const modalContainer = document.getElementById("modal-container");
-    const detailsSkeleton = document.getElementById("details-skeleton");
-    const detailsImage = document.getElementById("details-image");
     if (loadingSpinner && modalContainer) {
       showElement(loadingSpinner);
       hideElement(modalContainer);
-    }
-    if (detailsSkeleton) {
-      showElement(detailsSkeleton);
-    }
-    if (detailsImage) {
-      hideElement(detailsImage);
     }
     const result = await fetchUrl(
       URLS.detailsMovieUrl,

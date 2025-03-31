@@ -74,6 +74,7 @@ const ratingNumbers = {
 const defaultRating = 3;
 let showingItem = "";
 let loadMovies = null;
+let scrollInstance = null;
 function setShowingItem(value) {
   showingItem = value;
 }
@@ -85,6 +86,12 @@ function setLoadMovies(fn) {
 }
 function getLoadMovies() {
   return loadMovies;
+}
+function setScrollInstance(instance) {
+  scrollInstance = instance;
+}
+function getScrollInstance() {
+  return scrollInstance;
 }
 function createElement(tag, props = {}) {
   const element = document.createElement(tag);
@@ -239,14 +246,14 @@ function handleConnectionError() {
     $fallbackDetails.innerText = ERROR_MESSAGE.FALLBACK_ERROR;
   }
 }
-function handleNetworkError(infiniteScrollInstance2) {
-  if (infiniteScrollInstance2) {
-    infiniteScrollInstance2.stopInfiniteScroll();
+function handleNetworkError(infiniteScrollInstance) {
+  if (infiniteScrollInstance) {
+    infiniteScrollInstance.stopInfiniteScroll();
   }
   showLoadMoreButton();
   Toast.showToast(retryNotice, "info", 2e3);
 }
-async function fetchAndSetLoadingEvent(infiniteScrollInstance2) {
+async function fetchAndSetLoadingEvent(infiniteScrollInstance) {
   document.dispatchEvent(new CustomEvent("loading:start"));
   const loadMovies2 = getLoadMovies();
   let data = null;
@@ -266,10 +273,9 @@ async function fetchAndSetLoadingEvent(infiniteScrollInstance2) {
         detail: { isLastPage: true }
       })
     );
-    handleNetworkError(infiniteScrollInstance2);
+    handleNetworkError(infiniteScrollInstance);
   }
 }
-let isErrorHandled = false;
 function scrollToTop() {
   return new Promise((resolve) => {
     const onScroll = () => {
@@ -291,7 +297,6 @@ function scrollToTop() {
 }
 async function handleSearch(searchValue) {
   await scrollToTop();
-  isErrorHandled = false;
   setSearchResultTitle(searchValue);
   setSearchLoadingState();
   setLoadMovies(
@@ -303,13 +308,14 @@ async function handleSearch(searchValue) {
       searchValue
     )
   );
-  infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.stopInfiniteScroll();
+  const scrollInstance2 = getScrollInstance();
+  scrollInstance2 == null ? void 0 : scrollInstance2.stopInfiniteScroll();
   try {
-    const data = await fetchAndSetLoadingEvent(infiniteScrollInstance);
+    const data = await fetchAndSetLoadingEvent(scrollInstance2);
     if (data == null ? void 0 : data.results) renderMovieItems(data.results, true);
-    if (data == null ? void 0 : data.isLastPage) infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.stopInfiniteScroll();
+    if (data == null ? void 0 : data.isLastPage) scrollInstance2 == null ? void 0 : scrollInstance2.stopInfiniteScroll();
     else {
-      infiniteScrollInstance == null ? void 0 : infiniteScrollInstance.resumeInfiniteScroll();
+      scrollInstance2 == null ? void 0 : scrollInstance2.resumeInfiniteScroll();
     }
     displaySearchResults();
   } catch (error) {
@@ -338,13 +344,12 @@ function displaySearchResults() {
   showElement($thumbnailList);
 }
 function handleSearchError(error) {
-  if (isErrorHandled) return;
-  isErrorHandled = true;
   if (error.message !== ERROR_MESSAGE.NO_DATA) {
     Toast.showToast(error.message, "error", 3e3);
-    handleNetworkError(infiniteScrollInstance);
+    handleNetworkError(null);
   } else {
-    if (infiniteScrollInstance) infiniteScrollInstance.stopInfiniteScroll();
+    const scrollInstance2 = getScrollInstance();
+    if (scrollInstance2) scrollInstance2.stopInfiniteScroll();
     const $thumbnailContainer = document.getElementById("thumbnail-container");
     const $fallback = document.getElementById("fallback");
     const $fallbackDetails = document.getElementById("fallback-details");
@@ -601,7 +606,7 @@ function bindHeroEvents() {
     });
   }
 }
-function bindLoadMoreButton(infiniteScrollInstance2) {
+function bindLoadMoreButton(infiniteScrollInstance) {
   const loadMoreButton = document.getElementById("load-more");
   if (!loadMoreButton) return;
   loadMoreButton.addEventListener("click", async () => {
@@ -611,8 +616,8 @@ function bindLoadMoreButton(infiniteScrollInstance2) {
         method: "GET"
       });
       if (response.ok) {
-        if (infiniteScrollInstance2) {
-          infiniteScrollInstance2.resumeInfiniteScroll();
+        if (infiniteScrollInstance) {
+          infiniteScrollInstance.resumeInfiniteScroll();
         }
       } else {
         Toast.showToast("인터넷 연결을 확인해주세요.", "error", 2e3);
@@ -621,6 +626,15 @@ function bindLoadMoreButton(infiniteScrollInstance2) {
       Toast.showToast("인터넷 연결을 확인해주세요.", "error", 2e3);
     }
   });
+}
+function bindAllEvents(infiniteScrollInstance) {
+  bindLoadingEvents();
+  bindThumbnailClickEvent();
+  bindModalEvents();
+  bindStarRatingEvents();
+  bindHeaderScrollEvent();
+  bindHeroEvents();
+  bindLoadMoreButton(infiniteScrollInstance);
 }
 function showElement(element) {
   element == null ? void 0 : element.classList.remove("hide");
@@ -859,7 +873,7 @@ function setupInfiniteScroll() {
           isFetching = false;
           debounceTimeoutId = null;
         }
-      }, 300);
+      }, 700);
     }
   };
   const observer = new IntersectionObserver(observerCallback, {
@@ -871,7 +885,45 @@ function setupInfiniteScroll() {
   const instance = { observer, resumeInfiniteScroll, stopInfiniteScroll };
   return instance;
 }
-let infiniteScrollInstance = null;
+const convertResultToTMDBDetails = (movie) => {
+  return {
+    poster_path: movie.poster_path || "",
+    release_date: new Date(movie.release_date),
+    overview: movie.overview,
+    title: movie.title,
+    vote_average: movie.vote_average,
+    id: movie.id,
+    adult: movie.adult,
+    backdrop_path: movie.backdrop_path || "",
+    belongs_to_collection: {
+      id: 0,
+      name: "",
+      poster_path: "",
+      backdrop_path: ""
+    },
+    budget: 0,
+    genres: [],
+    homepage: "",
+    imdb_id: "",
+    origin_country: [],
+    original_language: movie.original_language,
+    original_title: movie.original_title,
+    popularity: movie.popularity,
+    production_companies: [],
+    production_countries: [],
+    revenue: 0,
+    runtime: 0,
+    spoken_languages: [],
+    status: "",
+    tagline: "",
+    video: movie.video,
+    vote_count: movie.vote_count
+  };
+};
+const handleError = (error) => {
+  Toast.showToast(error.message, "error", 5e3);
+  handleNetworkError(null);
+};
 const initMovies = () => {
   return createMovieLoader(
     URLS.popularMovieUrl,
@@ -880,60 +932,23 @@ const initMovies = () => {
     handleError
   );
 };
-const handleError = (error) => {
-  Toast.showToast(error.message, "error", 5e3);
-  handleNetworkError(infiniteScrollInstance);
-};
-const setupMovieData = (data) => {
-  if (!data) {
-    throw new Error("데이터가 없습니다. 잠시후 다시 사용해주세요.");
-  }
-  const firstMovie = data.results[0];
-  setShowingItem(String(firstMovie.id));
-  return {
-    firstMovie,
-    movieList: data.results
-  };
-};
-const createBasicMovieDetails = (movie) => ({
-  poster_path: movie.poster_path || "",
-  release_date: movie.release_date,
-  overview: movie.overview,
-  title: movie.title,
-  vote_average: movie.vote_average,
-  genres: [],
-  id: movie.id
-});
-const renderHeroSection = (firstMovie) => {
-  renderHeaderAndHero();
-  updateHero(firstMovie);
-  updateDetails(createBasicMovieDetails(firstMovie));
-};
-const renderMovieList = (movies) => {
-  renderMovieItems(movies, false);
-};
-const renderApp = (data) => {
-  const { firstMovie, movieList } = setupMovieData(data);
-  renderHeroSection(firstMovie);
-  renderMovieList(movieList);
-};
-const bindEventListeners = () => {
-  bindLoadingEvents();
-  bindThumbnailClickEvent();
-  bindModalEvents();
-  bindStarRatingEvents();
-  bindHeaderScrollEvent();
-  bindHeroEvents();
-  bindLoadMoreButton(infiniteScrollInstance);
-};
 const main = async () => {
   try {
     const loadMovies2 = initMovies();
     setLoadMovies(loadMovies2);
-    const data = await fetchAndSetLoadingEvent(infiniteScrollInstance);
-    infiniteScrollInstance = setupInfiniteScroll();
-    renderApp(data);
-    bindEventListeners();
+    const data = await fetchAndSetLoadingEvent(null);
+    if (!data) {
+      throw new Error("데이터가 없습니다. 잠시후 다시 사용해주세요.");
+    }
+    const firstMovie = data.results[0];
+    setShowingItem(String(firstMovie.id));
+    renderHeaderAndHero();
+    updateHero(firstMovie);
+    updateDetails(convertResultToTMDBDetails(firstMovie));
+    renderMovieItems(data.results, false);
+    const infiniteScrollInstance = setupInfiniteScroll();
+    setScrollInstance(infiniteScrollInstance);
+    bindAllEvents(infiniteScrollInstance);
   } catch (error) {
     handleConnectionError();
   }

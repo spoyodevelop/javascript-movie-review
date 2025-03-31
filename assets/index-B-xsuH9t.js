@@ -253,8 +253,12 @@ function handleNetworkError(infiniteScrollInstance) {
   showLoadMoreButton();
   Toast.showToast(retryNotice, "info", 2e3);
 }
+const LOADING_EVENTS = {
+  START: "loading:start",
+  END: "loading:end"
+};
 async function fetchAndSetLoadingEvent(infiniteScrollInstance) {
-  document.dispatchEvent(new CustomEvent("loading:start"));
+  document.dispatchEvent(new CustomEvent(LOADING_EVENTS.START));
   const loadMovies2 = getLoadMovies();
   let data = null;
   try {
@@ -262,14 +266,14 @@ async function fetchAndSetLoadingEvent(infiniteScrollInstance) {
       data = await loadMovies2();
     }
     document.dispatchEvent(
-      new CustomEvent("loading:end", {
+      new CustomEvent(LOADING_EVENTS.END, {
         detail: { isLastPage: (data == null ? void 0 : data.isLastPage) ?? false }
       })
     );
     return data;
   } catch (error) {
     document.dispatchEvent(
-      new CustomEvent("loading:end", {
+      new CustomEvent(LOADING_EVENTS.START, {
         detail: { isLastPage: true }
       })
     );
@@ -489,10 +493,6 @@ async function handleItemClick(id) {
     if (error instanceof Error) Toast.showToast(error.message, "error", 5e3);
   }
 }
-const LOADING_EVENTS = {
-  START: "loading:start",
-  END: "loading:end"
-};
 const handleLoadingStart = () => {
   const skeleton = document.querySelector(".skeleton-list");
   const loadMore = document.getElementById("load-more");

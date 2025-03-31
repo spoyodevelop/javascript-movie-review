@@ -124,16 +124,17 @@ const ERROR_MESSAGE = {
   FALLBACK_ERROR: "통신 상황이 좋지 않으니, 잠시후 새로고침하고 다시 시도해주세요.",
   RETRY_ERROR: "최대 대기 시간(1분)을 초과했습니다. 인터넷 상태를 체크하신뒤에 새로 고침을 해주세요."
 };
-async function fetchUrl(url, queryObject, options = {}, path) {
-  function buildMovieUrl(baseUrl, path2, queryObject2 = {}) {
-    let url2 = baseUrl;
-    if (path2) {
-      url2 += `/${path2}`;
-    }
-    const queryString = new URLSearchParams(queryObject2).toString();
-    return queryString ? `${url2}?${queryString}` : url2;
+function buildUrl(baseUrl, path, queryObject = {}) {
+  let url = baseUrl;
+  if (path) {
+    url += `/${path}`;
   }
-  const finalUrl = buildMovieUrl(url, path, queryObject);
+  const queryParams = queryObject instanceof URLSearchParams ? queryObject : new URLSearchParams(queryObject);
+  const queryString = queryParams.toString();
+  return queryString ? `${url}?${queryString}` : url;
+}
+async function fetchUrl(url, queryObject, options = {}, path) {
+  const finalUrl = buildUrl(url, path, queryObject);
   try {
     const response = await fetch(finalUrl, options);
     if (!response.ok) {
@@ -297,6 +298,95 @@ function scrollToTop() {
       resolve();
     }
   });
+}
+function setupInfiniteScroll() {
+  const $thumbnailContainer = document.getElementById("thumbnail-container");
+  if (!$thumbnailContainer) return null;
+  const sentinel = document.createElement("div");
+  sentinel.id = "infinite-scroll-sentinel";
+  $thumbnailContainer.appendChild(sentinel);
+  let infiniteScrollSuspended = false;
+  let isFetching = false;
+  let debounceTimeoutId = null;
+  function resumeInfiniteScroll() {
+    if (debounceTimeoutId) {
+      clearTimeout(debounceTimeoutId);
+      debounceTimeoutId = null;
+    }
+    infiniteScrollSuspended = false;
+    isFetching = false;
+    if (sentinel.parentNode) {
+      sentinel.parentNode.removeChild(sentinel);
+    }
+    if ($thumbnailContainer && observer) {
+      $thumbnailContainer.appendChild(sentinel);
+      observer.observe(sentinel);
+    }
+  }
+  function stopInfiniteScroll() {
+    if (debounceTimeoutId) {
+      clearTimeout(debounceTimeoutId);
+      debounceTimeoutId = null;
+    }
+    infiniteScrollSuspended = true;
+    if (observer) {
+      observer.unobserve(sentinel);
+    }
+    if (sentinel.parentNode) {
+      sentinel.parentNode.removeChild(sentinel);
+    }
+  }
+  const observerCallback = (entries) => {
+    if (infiniteScrollSuspended || isFetching) return;
+    const entry = entries[0];
+    if (entry.isIntersecting) {
+      if (debounceTimeoutId) {
+        clearTimeout(debounceTimeoutId);
+      }
+      debounceTimeoutId = window.setTimeout(async () => {
+        if (isFetching || infiniteScrollSuspended) {
+          debounceTimeoutId = null;
+          return;
+        }
+        isFetching = true;
+        if (observer) {
+          observer.unobserve(sentinel);
+        }
+        try {
+          const data = await fetchAndSetLoadingEvent(instance);
+          if (data == null ? void 0 : data.results) {
+            const scrollY = window.scrollY;
+            renderMovieItems(data.results, false);
+            window.scrollTo(0, scrollY + 10);
+          }
+          if (data == null ? void 0 : data.isLastPage) {
+            infiniteScrollSuspended = true;
+          } else {
+            if (sentinel.parentNode) {
+              sentinel.parentNode.removeChild(sentinel);
+            }
+            if ($thumbnailContainer && observer) {
+              $thumbnailContainer.appendChild(sentinel);
+              observer.observe(sentinel);
+            }
+          }
+        } catch (error) {
+          console.error("Fetch error:", error);
+        } finally {
+          isFetching = false;
+          debounceTimeoutId = null;
+        }
+      }, 700);
+    }
+  };
+  const observer = new IntersectionObserver(observerCallback, {
+    root: null,
+    rootMargin: "20px",
+    threshold: 0.2
+  });
+  observer.observe(sentinel);
+  const instance = { observer, resumeInfiniteScroll, stopInfiniteScroll };
+  return instance;
 }
 async function handleSearch(searchValue) {
   await scrollToTop();
@@ -803,95 +893,6 @@ function showLoadMoreButton() {
   const $loadMore = document.getElementById("load-more");
   showElement($loadMore);
 }
-function setupInfiniteScroll() {
-  const $thumbnailContainer = document.getElementById("thumbnail-container");
-  if (!$thumbnailContainer) return null;
-  const sentinel = document.createElement("div");
-  sentinel.id = "infinite-scroll-sentinel";
-  $thumbnailContainer.appendChild(sentinel);
-  let infiniteScrollSuspended = false;
-  let isFetching = false;
-  let debounceTimeoutId = null;
-  function resumeInfiniteScroll() {
-    if (debounceTimeoutId) {
-      clearTimeout(debounceTimeoutId);
-      debounceTimeoutId = null;
-    }
-    infiniteScrollSuspended = false;
-    isFetching = false;
-    if (sentinel.parentNode) {
-      sentinel.parentNode.removeChild(sentinel);
-    }
-    if ($thumbnailContainer && observer) {
-      $thumbnailContainer.appendChild(sentinel);
-      observer.observe(sentinel);
-    }
-  }
-  function stopInfiniteScroll() {
-    if (debounceTimeoutId) {
-      clearTimeout(debounceTimeoutId);
-      debounceTimeoutId = null;
-    }
-    infiniteScrollSuspended = true;
-    if (observer) {
-      observer.unobserve(sentinel);
-    }
-    if (sentinel.parentNode) {
-      sentinel.parentNode.removeChild(sentinel);
-    }
-  }
-  const observerCallback = (entries) => {
-    if (infiniteScrollSuspended || isFetching) return;
-    const entry = entries[0];
-    if (entry.isIntersecting) {
-      if (debounceTimeoutId) {
-        clearTimeout(debounceTimeoutId);
-      }
-      debounceTimeoutId = window.setTimeout(async () => {
-        if (isFetching || infiniteScrollSuspended) {
-          debounceTimeoutId = null;
-          return;
-        }
-        isFetching = true;
-        if (observer) {
-          observer.unobserve(sentinel);
-        }
-        try {
-          const data = await fetchAndSetLoadingEvent(instance);
-          if (data == null ? void 0 : data.results) {
-            const scrollY = window.scrollY;
-            renderMovieItems(data.results, false);
-            window.scrollTo(0, scrollY + 10);
-          }
-          if (data == null ? void 0 : data.isLastPage) {
-            infiniteScrollSuspended = true;
-          } else {
-            if (sentinel.parentNode) {
-              sentinel.parentNode.removeChild(sentinel);
-            }
-            if ($thumbnailContainer && observer) {
-              $thumbnailContainer.appendChild(sentinel);
-              observer.observe(sentinel);
-            }
-          }
-        } catch (error) {
-          console.error("Fetch error:", error);
-        } finally {
-          isFetching = false;
-          debounceTimeoutId = null;
-        }
-      }, 700);
-    }
-  };
-  const observer = new IntersectionObserver(observerCallback, {
-    root: null,
-    rootMargin: "20px",
-    threshold: 0.2
-  });
-  observer.observe(sentinel);
-  const instance = { observer, resumeInfiniteScroll, stopInfiniteScroll };
-  return instance;
-}
 const convertResultToTMDBDetails = (movie) => {
   return {
     poster_path: movie.poster_path || "",
@@ -927,6 +928,43 @@ const convertResultToTMDBDetails = (movie) => {
     vote_count: movie.vote_count
   };
 };
+function initScrollToTopButton() {
+  const scrollToTopBtn = document.getElementById("scroll-to-top-btn");
+  if (!scrollToTopBtn) return;
+  let lastScrollY = window.scrollY;
+  let ticking = false;
+  const handleScroll = () => {
+    lastScrollY = window.scrollY;
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        updateButtonVisibility(lastScrollY);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  };
+  const updateButtonVisibility = (scrollY) => {
+    if (scrollY > 300) {
+      if (!scrollToTopBtn.classList.contains("show")) {
+        scrollToTopBtn.classList.remove("hide");
+        void scrollToTopBtn.offsetWidth;
+        scrollToTopBtn.classList.add("show");
+      }
+    } else {
+      if (scrollToTopBtn.classList.contains("show")) {
+        scrollToTopBtn.classList.remove("show");
+        setTimeout(() => {
+          scrollToTopBtn.classList.add("hide");
+        }, 400);
+      }
+    }
+  };
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  updateButtonVisibility(window.scrollY);
+  scrollToTopBtn.addEventListener("click", () => {
+    scrollToTop();
+  });
+}
 const handleError = (error) => {
   Toast.showToast(error.message, "error", 5e3);
   handleNetworkError();
@@ -956,6 +994,7 @@ const main = async () => {
     const infiniteScrollInstance = setupInfiniteScroll();
     setScrollInstance(infiniteScrollInstance);
     bindAllEvents(infiniteScrollInstance);
+    initScrollToTopButton();
   } catch (error) {
     handleConnectionError();
   }

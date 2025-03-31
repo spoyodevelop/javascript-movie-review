@@ -990,6 +990,64 @@ button {
 .toast.success {
   background-color: #5cb85c;
 }
+/* 맨 위로 가기 버튼 스타일 */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--color-lightblue-90);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform: translateY(20px) scale(0.9);
+  padding: 0;
+  line-height: 0;
+}
+.scroll-to-top-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 3;
+  display: block;
+  margin: auto;
+}
+.scroll-to-top-btn.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+.scroll-to-top-btn:hover {
+  background-color: var(--color-lightblue-80);
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+.scroll-to-top-btn:active {
+  transform: translateY(-2px) scale(0.95);
+  transition: all 0.1s;
+}
+@media (max-width: 768px) {
+  .scroll-to-top-btn {
+    width: 42px;
+    height: 42px;
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .scroll-to-top-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
 .show {
   display: block;
 }
@@ -1157,4 +1215,36 @@ button.detail:hover {
     font-size: 0.9rem;
     margin-top: 8px;
   }
+}
+/* 맨 위로 가기 버튼 스타일 */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--color-lightblue-90);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform: translateY(20px) scale(0.9);
+  padding: 0; /* 패딩 제거 */
+}
+.scroll-to-top-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 3;
+  display: block; /* 인라인 요소 대신 블록으로 변경 */
+  margin: 0 auto; /* 가운데 정렬 */
+  position: relative; /* 위치 조정을 위한 상대 위치 설정 */
+  top: 0; /* 위치 미세 조정 */
 }

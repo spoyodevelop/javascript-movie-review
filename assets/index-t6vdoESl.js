@@ -246,9 +246,10 @@ function handleConnectionError() {
     $fallbackDetails.innerText = ERROR_MESSAGE.FALLBACK_ERROR;
   }
 }
-function handleNetworkError(infiniteScrollInstance) {
-  if (infiniteScrollInstance) {
-    infiniteScrollInstance.stopInfiniteScroll();
+function handleNetworkError() {
+  const scrollInstance2 = getScrollInstance();
+  if (scrollInstance2) {
+    scrollInstance2.stopInfiniteScroll();
   }
   showLoadMoreButton();
   Toast.showToast(retryNotice, "info", 2e3);
@@ -277,7 +278,7 @@ async function fetchAndSetLoadingEvent(infiniteScrollInstance) {
         detail: { isLastPage: true }
       })
     );
-    handleNetworkError(infiniteScrollInstance);
+    handleNetworkError();
   }
 }
 function scrollToTop() {
@@ -350,7 +351,7 @@ function displaySearchResults() {
 function handleSearchError(error) {
   if (error.message !== ERROR_MESSAGE.NO_DATA) {
     Toast.showToast(error.message, "error", 3e3);
-    handleNetworkError(null);
+    handleNetworkError();
   } else {
     const scrollInstance2 = getScrollInstance();
     if (scrollInstance2) scrollInstance2.stopInfiniteScroll();
@@ -922,7 +923,7 @@ const convertResultToTMDBDetails = (movie) => {
 };
 const handleError = (error) => {
   Toast.showToast(error.message, "error", 5e3);
-  handleNetworkError(null);
+  handleNetworkError();
 };
 const initMovies = () => {
   return createMovieLoader(

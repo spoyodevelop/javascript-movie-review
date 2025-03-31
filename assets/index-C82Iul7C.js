@@ -124,7 +124,7 @@ const ERROR_MESSAGE = {
   FALLBACK_ERROR: "통신 상황이 좋지 않으니, 잠시후 새로고침하고 다시 시도해주세요.",
   RETRY_ERROR: "최대 대기 시간(1분)을 초과했습니다. 인터넷 상태를 체크하신뒤에 새로 고침을 해주세요."
 };
-function buildUrl(baseUrl, path, queryObject = {}) {
+function createUrlWithParams(baseUrl, path, queryObject = {}) {
   let url = baseUrl;
   if (path) {
     url += `/${path}`;
@@ -134,7 +134,7 @@ function buildUrl(baseUrl, path, queryObject = {}) {
   return queryString ? `${url}?${queryString}` : url;
 }
 async function fetchUrl(url, queryObject, options = {}, path) {
-  const finalUrl = buildUrl(url, path, queryObject);
+  const finalUrl = createUrlWithParams(url, path, queryObject);
   try {
     const response = await fetch(finalUrl, options);
     if (!response.ok) {
